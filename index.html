@@ -248,7 +248,11 @@ function PersonalTaxTab() {
             }}>
               <div style={{width:7,height:7,borderRadius:'50%',background:on?era.color:C.t3,flexShrink:0}}/>
               {era.label}
-              <span style={{fontSize:10,opacity:.7}}>{era.party==='Labor'?'ALP':'LNP'}</span>
+              <span style={{
+                fontSize:9,padding:'1px 5px',borderRadius:3,fontWeight:700,
+                background:era.proposed?'rgba(168,33,207,.25)':era.party==='Labor'?'rgba(239,68,68,.2)':'rgba(59,130,246,.2)',
+                color:era.proposed?'#e879f9':era.party==='Labor'?'#f87171':'#93c5fd',
+              }}>{era.proposed?'PROPOSED':era.party==='Labor'?'ALP':'LNP'}</span>
             </button>
           );
         })}
@@ -366,7 +370,10 @@ function PersonalTaxTab() {
                 <div style={{width:32,height:32,borderRadius:7,background:`${era.color}15`,border:`1px solid ${era.color}25`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:era.color,fontWeight:700}}>{era.pm[0]}</div>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{era.pm}</div>
-                  <div style={{fontSize:10,color:era.color,fontFamily:C.mono}}>{era.party} · {era.years}</div>
+                  <div style={{display:'flex',gap:5,alignItems:'center',marginTop:2}}>
+                    <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,fontWeight:700,background:era.proposed?'rgba(168,33,207,.3)':era.party==='Labor'?'rgba(239,68,68,.2)':'rgba(59,130,246,.2)',color:era.proposed?'#e879f9':era.party==='Labor'?'#f87171':'#93c5fd'}}>{era.proposed?'PROPOSED':era.party==='Labor'?'ALP':'LNP'}</span>
+                    <span style={{fontSize:10,color:C.t3,fontFamily:C.mono}}>{era.years}</span>
+                  </div>
                 </div>
                 <div style={{marginLeft:'auto',color:C.t4,transition:'transform .2s',transform:expanded===era.id?'rotate(180deg)':'none'}}>▾</div>
               </div>
@@ -677,6 +684,330 @@ function InvestorBreaksTab() {
               </div>
             </div>
           ))}
+        </Card>
+      </div>
+
+      {/* Franking history */}
+      <div>
+        <SLabel>Franking Credits · History</SLabel>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+          {[
+            {year:'1987', color:C.labor, icon:'🏛️', title:'Introduced by Keating', desc:'Dividend imputation introduced to eliminate double taxation. Credits could offset tax owed but excess was lost.'},
+            {year:'2000', color:C.liberal, icon:'💵', title:'Full Refundability (Howard)', desc:'Costello made excess franking credits fully refundable in cash — a major benefit for retirees and low-income investors with SMSF holdings.'},
+            {year:'2019', color:C.labor, icon:'🗳️', title:'Labor Proposal Defeated (2019)', desc:'Shorten proposed removing cash refunds for excess franking credits. It became a central issue in the 2019 election — Labor lost. Policy dropped by Albanese.'},
+          ].map(item=>(
+            <div key={item.year} style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${item.color}`,borderRadius:8,padding:14}}>
+              <div style={{fontSize:20,marginBottom:8}}>{item.icon}</div>
+              <div style={{color:item.color,fontFamily:C.mono,fontSize:11,marginBottom:4}}>{item.year}</div>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>{item.title}</div>
+              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Franked Dividend Calculator */}
+      <div>
+        <SLabel>Franked Dividend Calculator · Net cash in hand at every marginal rate</SLabel>
+        <FrankedDivCalc/>
+      </div>
+
+      {/* Investment + CGT Calculator */}
+      <div>
+        <SLabel>📈 Investment Growth &amp; CGT Calculator · Shares / ETFs / Index Funds</SLabel>
+        <InvestCalc/>
+      </div>
+    </div>
+  );
+}
+
+// ─── FRANKED DIVIDEND CALCULATOR ─────────────────────────────
+function FrankedDivCalc() {
+  const [divAmount,setDivAmount] = useState(10000);
+  const [compRate,setCompRate] = useState(30);
+  const [income,setIncome] = useState(85000);
+
+  const compFrac = compRate / 100;
+  const frankingCredit = divAmount * compFrac / (1 - compFrac);
+  const grossedUp = divAmount + frankingCredit;
+
+  const RATE_ROWS = [
+    {label:'0% — No other income / tax-free',rate:0,era:'Any'},
+    {label:'14% — Budget 2027-28 (lowest bracket)',rate:0.14,era:'Budget 27-28',color:'#a21caf'},
+    {label:'15% — Budget 2026-27',rate:0.15,era:'Budget 26-27',color:'#d946ef'},
+    {label:'16% — Budget 2025-26',rate:0.16,era:'Budget 25-26',color:'#e879f9'},
+    {label:'19% — Current (2024-25)',rate:0.19,era:'Current',color:'#f43f5e'},
+    {label:'30% — Middle bracket ($45k–$135k)',rate:0.30,era:'All eras',color:C.yellow},
+    {label:'37% — High income ($135k–$190k)',rate:0.37,era:'All eras',color:C.orange},
+    {label:'45% — Top rate ($190k+)',rate:0.45,era:'All eras',color:'#f87171'},
+  ];
+
+  // Marginal rate for the slider income (using 2024-25 as baseline)
+  const brackets24 = INCOME_ERAS.find(e=>e.id==='albanese_2024').brackets;
+  const sliderMarg = marginalRate(income, brackets24) / 100;
+  const sliderGrossTax = grossedUp * sliderMarg;
+  const sliderNetTax = sliderGrossTax - frankingCredit;
+  const sliderRefund = sliderNetTax < 0 ? -sliderNetTax : 0;
+  const sliderCashOut = divAmount - Math.max(0, sliderNetTax);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        {/* Controls */}
+        <Card>
+          <SLabel>Franked Dividend Calculator</SLabel>
+          <div style={{display:'flex',flexDirection:'column',gap:13}}>
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                <span>Dividend received (cash)</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(divAmount)}</strong>
+              </div>
+              <input type="range" min={1000} max={100000} step={1000} value={divAmount} onChange={e=>setDivAmount(+e.target.value)}/>
+            </div>
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                <span>Company tax rate</span><strong style={{color:C.t1,fontFamily:C.mono}}>{compRate}%</strong>
+              </div>
+              <div style={{display:'flex',gap:7}}>
+                {[{r:30,l:'30% Large company'},{r:25,l:'25% Small business'}].map(o=>(
+                  <button key={o.r} onClick={()=>setCompRate(o.r)} style={{
+                    flex:1,padding:'7px 6px',borderRadius:7,fontSize:12,
+                    border:`1px solid ${compRate===o.r?C.liberal+'50':C.border}`,
+                    background:compRate===o.r?`${C.liberal}15`:'transparent',
+                    color:compRate===o.r?C.liberal:C.t3,transition:'all .15s',
+                  }}>{o.l}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                <span>Your other income</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(income)}</strong>
+              </div>
+              <input type="range" min={0} max={300000} step={5000} value={income} onChange={e=>setIncome(+e.target.value)}/>
+            </div>
+            <div style={{background:'rgba(0,0,0,.3)',borderRadius:8,padding:13}}>
+              {[
+                ['Dividend received',fAUD(divAmount),''],
+                ['Franking credit attached',fAUD(frankingCredit),C.yellow],
+                ['Grossed-up dividend',fAUD(grossedUp),''],
+                ['─','',''],
+                ['Your marginal rate',`${(sliderMarg*100).toFixed(0)}%`,''],
+                ['Tax on grossed-up div',fAUD(sliderGrossTax),''],
+                ['Less franking credit',`−${fAUD(frankingCredit)}`,'#f87171'],
+                ['Net tax to pay',sliderNetTax>0?fAUD(sliderNetTax):'$0 (refund!)',sliderNetTax>0?'#f87171':C.green],
+                ['Franking refund (if any)',sliderRefund>0?`+${fAUD(sliderRefund)}`:'$0',C.green],
+                ['Total cash in hand',fAUD(sliderCashOut+sliderRefund),C.green],
+              ].map(([k,v,c])=>k==='─'?<div key={k} style={{height:6}}/>:(
+                <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+                  <span style={{color:C.t2}}>{k}</span>
+                  <span style={{fontFamily:C.mono,fontWeight:600,color:c||C.t1}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* Rate table */}
+        <Card>
+          <SLabel>Net outcome at every marginal rate — {fAUD(divAmount)} dividend · {compRate}% company tax</SLabel>
+          <div style={{fontSize:11,color:C.t3,marginBottom:12}}>Franking credit: {fAUD(frankingCredit)} attached. Gross-up: {fAUD(grossedUp)}</div>
+          <table>
+            <thead><tr>
+              {['Marginal Rate','Gross Tax','Net Tax/Refund','Cash In Hand'].map(h=>(
+                <th key={h} style={{textAlign:h==='Marginal Rate'?'left':'right',padding:'5px 8px',color:C.t3,fontWeight:600,borderBottom:`1px solid ${C.border}`,fontSize:10,fontFamily:C.mono}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {RATE_ROWS.map((row,i)=>{
+                const grossTax = grossedUp * row.rate;
+                const netTax = grossTax - frankingCredit;
+                const refund = netTax < 0 ? -netTax : 0;
+                const cashOut = divAmount - Math.max(0,netTax) + refund;
+                const isYours = Math.abs(row.rate - sliderMarg) < 0.001;
+                return(
+                  <tr key={row.label} style={{background:isYours?'rgba(59,130,246,.08)':i%2===0?'rgba(255,255,255,.01)':'transparent',borderBottom:`1px solid ${C.border}`}}>
+                    <td style={{padding:'6px 8px',fontSize:11,color:row.color||C.t2}}>
+                      {isYours&&<span style={{color:C.accent,marginRight:5}}>▶</span>}{row.label}
+                    </td>
+                    <td style={{padding:'6px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:C.t2}}>{fAUD(grossTax)}</td>
+                    <td style={{padding:'6px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:netTax>0?'#f87171':C.green,fontWeight:600}}>
+                      {netTax>0?`−${fAUD(netTax)}`:`+${fAUD(refund)}`}
+                    </td>
+                    <td style={{padding:'6px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:C.green,fontWeight:700}}>{fAUD(cashOut)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{marginTop:10,fontSize:11,color:C.t3,lineHeight:1.6}}>
+            Earners below the company tax rate get a cash refund of excess franking credits (Howard's 2000 reform). At 30% company rate, investors at 30% marginal pay exactly the right amount — no top-up, no refund.
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── INVESTMENT GROWTH + CGT CALCULATOR ──────────────────────
+function InvestCalc() {
+  const [principal,setPrincipal] = useState(50000);
+  const [annualReturn,setAnnualReturn] = useState(7);
+  const [years,setYears] = useState(10);
+  const [otherIncome,setOtherIncome] = useState(85000);
+
+  const brackets24 = INCOME_ERAS.find(e=>e.id==='albanese_2024').brackets;
+  const brackets27 = INCOME_ERAS.find(e=>e.id==='albanese_2027').brackets;
+
+  function computeScenario(inc, yrs, p, rPct, bCurrentLaw, bFutureLaw) {
+    const fv = p * Math.pow(1 + rPct/100, yrs);
+    const gain = fv - p;
+    if (gain <= 0) return {fv, gain:0, cgtCurrent:0, cgtProposed:0};
+
+    // Current law: 50% CGT discount (if held >12 months)
+    const disc = yrs >= 1 ? 0.5 : 1.0;
+    const taxableGainCurr = gain * disc;
+    const cgtCurrent = Math.max(0,
+      calcTax(inc + taxableGainCurr, bCurrentLaw) - calcTax(inc, bCurrentLaw)
+    );
+
+    // Proposed law: CPI indexation + 30% minimum tax
+    const inflationAdj = p * (Math.pow(1.025, yrs) - 1);
+    const realGain = Math.max(0, gain - inflationAdj);
+    const marginalCGT = Math.max(0,
+      calcTax(inc + realGain, bFutureLaw) - calcTax(inc, bFutureLaw)
+    );
+    const cgtProposed = Math.max(marginalCGT, realGain * 0.30);
+
+    return {fv, gain, cgtCurrent, cgtProposed};
+  }
+
+  const {fv, gain, cgtCurrent, cgtProposed} = computeScenario(otherIncome, years, principal, annualReturn, brackets24, brackets27);
+
+  const chartData = [1,2,3,5,7,10,15,20,25,30].map(y => {
+    const r = computeScenario(otherIncome, y, principal, annualReturn, brackets24, brackets27);
+    return {
+      year: `Yr ${y}`,
+      'Value': Math.round(r.fv),
+      'Net (current law)': Math.round(r.fv - r.cgtCurrent),
+      'Net (proposed law)': Math.round(r.fv - r.cgtProposed),
+    };
+  });
+
+  const YEAR_OPTIONS = [1,2,3,5,7,10,15,20,25,30];
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <Card>
+          <SLabel>Investment CGT Calculator</SLabel>
+          <div style={{display:'flex',flexDirection:'column',gap:13}}>
+            {[
+              {l:'Initial investment',v:principal,set:setPrincipal,min:1000,max:500000,step:5000,fmt:fAUD},
+              {l:'Annual return %',v:annualReturn,set:setAnnualReturn,min:1,max:20,step:0.5,fmt:v=>`${v}%`},
+              {l:'Other income (salary etc.)',v:otherIncome,set:setOtherIncome,min:0,max:300000,step:5000,fmt:fAUD},
+            ].map(({l,v,set,min,max,step,fmt})=>(
+              <div key={l}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                  <span>{l}</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fmt(v)}</strong>
+                </div>
+                <input type="range" min={min} max={max} step={step} value={v} onChange={e=>set(+e.target.value)}/>
+              </div>
+            ))}
+            <div>
+              <div style={{fontSize:12,color:C.t2,marginBottom:7}}>Sell after</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                {YEAR_OPTIONS.map(y=>(
+                  <button key={y} onClick={()=>setYears(y)} style={{
+                    padding:'5px 10px',borderRadius:5,fontSize:12,
+                    border:`1px solid ${years===y?C.accent+'50':C.border}`,
+                    background:years===y?`${C.accent}15`:'transparent',
+                    color:years===y?C.accent:C.t3,fontFamily:C.mono,transition:'all .15s',
+                  }}>{y}yr</button>
+                ))}
+              </div>
+            </div>
+            <div style={{background:'rgba(0,0,0,.3)',borderRadius:8,padding:13}}>
+              {[
+                ['Initial investment',fAUD(principal),''],
+                ['Value after '+years+' years',fAUD(fv),C.green],
+                ['Total gain',fAUD(gain),C.green],
+                ['─','',''],
+                ['CGT (current law — 50% disc.)',fAUD(cgtCurrent),'#f87171'],
+                ['Net after tax (current law)',fAUD(fv-cgtCurrent),C.liberal],
+                ['─','',''],
+                ['CGT (proposed — index+30% min)',fAUD(cgtProposed),'#f87171'],
+                ['Net after tax (proposed)',fAUD(fv-cgtProposed),C.yellow],
+                ['─','',''],
+                ['Difference (proposed vs current)',fAUD(cgtProposed-cgtCurrent),cgtProposed>cgtCurrent?'#f87171':C.green],
+              ].map(([k,v,c])=>k==='─'?<div key={k+v} style={{height:6}}/>:(
+                <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+                  <span style={{color:C.t2}}>{k}</span>
+                  <span style={{fontFamily:C.mono,fontWeight:600,color:c||C.t1}}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:11,color:C.t3,lineHeight:1.6}}>
+              Proposed law assumes 2.5%/yr CPI indexation and 30% minimum tax on real gain. Current law: 50% discount for assets held &gt;12 months. Assumes purchase after 12 May 2026 (no grandfathering). Main residence always CGT-free.
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <SLabel>Value Over Time · Current vs Proposed CGT</SLabel>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={chartData} margin={{top:4,right:16,left:0,bottom:4}}>
+              <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+              <XAxis dataKey="year" tick={{fill:C.t3,fontSize:10,fontFamily:C.mono}} axisLine={{stroke:C.border}} tickLine={false}/>
+              <YAxis tick={{fill:C.t3,fontSize:10,fontFamily:C.mono}} axisLine={false} tickLine={false} width={56} tickFormatter={v=>v>=1000000?`$${(v/1000000).toFixed(1)}M`:`$${(v/1000).toFixed(0)}k`}/>
+              <Tooltip content={<ChartTip fmt={fAUD} xLabel="Year"/>}/>
+              <Line type="monotone" dataKey="Value" stroke={C.t3} strokeWidth={1.5} dot={false} strokeDasharray="4 4" name="Gross value"/>
+              <Line type="monotone" dataKey="Net (current law)" stroke={C.liberal} strokeWidth={2.5} dot={false} name="Net after tax (current law)"/>
+              <Line type="monotone" dataKey="Net (proposed law)" stroke={C.yellow} strokeWidth={2.5} dot={false} name="Net after tax (proposed)" strokeDasharray="6 3"/>
+            </LineChart>
+          </ResponsiveContainer>
+          <div style={{display:'flex',gap:14,marginTop:10,justifyContent:'center'}}>
+            {[{c:C.t3,l:'Gross value',d:'4 4'},{c:C.liberal,l:'Net: current law'},{c:C.yellow,l:'Net: proposed law',d:'6 3'}].map(p=>(
+              <div key={p.l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.t2}}>
+                <div style={{width:16,height:2.5,background:p.c,borderRadius:2}}/>{p.l}
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:14}}>
+            <SLabel>Comparison Table</SLabel>
+            <div style={{overflowX:'auto'}}>
+              <table>
+                <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
+                  {['Years','Value','Gain','CGT (current)','Net (current)','CGT (proposed)','Net (proposed)','Difference'].map(h=>(
+                    <th key={h} style={{textAlign:h==='Years'?'left':'right',padding:'5px 8px',color:C.t3,fontWeight:600,fontSize:10,fontFamily:C.mono,whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {YEAR_OPTIONS.map((y,i)=>{
+                    const r=computeScenario(otherIncome,y,principal,annualReturn,brackets24,brackets27);
+                    const diff=r.cgtProposed-r.cgtCurrent;
+                    const isSelected=years===y;
+                    return(
+                      <tr key={y} onClick={()=>setYears(y)} style={{
+                        background:isSelected?'rgba(59,130,246,.1)':i%2===0?'rgba(255,255,255,.01)':'transparent',
+                        borderBottom:`1px solid ${C.border}`,cursor:'pointer',
+                      }}>
+                        <td style={{padding:'5px 8px',fontFamily:C.mono,color:isSelected?C.accent:C.t2,fontWeight:isSelected?700:400}}>{y}yr</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:C.t1}}>{fAUD(r.fv)}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:C.green}}>{fAUD(r.gain)}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:'#f87171'}}>{fAUD(r.cgtCurrent)}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:C.liberal}}>{fAUD(r.fv-r.cgtCurrent)}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:'#f87171'}}>{fAUD(r.cgtProposed)}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:C.yellow}}>{fAUD(r.fv-r.cgtProposed)}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',fontFamily:C.mono,fontSize:11,color:diff>0?'#f87171':C.green,fontWeight:700}}>
+                          {diff>0?`+${fAUD(diff)}`:`−${fAUD(-diff)}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{marginTop:8,fontSize:10,color:C.t4}}>Click a row to update the calculator · Difference = extra CGT under proposed vs current law</div>
+          </div>
         </Card>
       </div>
     </div>
@@ -1108,7 +1439,9 @@ function BudgetProposalsTab() {
             </div>
           ))}
         </div>
-        <div style={{fontSize:11,color:C.t3,fontStyle:'italic'}}>Savings shown for someone with full $18,201–$45,000 bracket exposure (e.g. $45,000 taxable income). Actual savings depend on income.</div>
+        <div style={{fontSize:11,color:C.t3,lineHeight:1.6}}>
+          ⚠️ The saving is a <strong>flat dollar amount</strong> for all earners above $45,000 — higher earners get the same $804/$1,072/$1,340 as median earners, because the cut only applies to the $18,201–$45,000 band. For earners under $45,000, savings are proportional to how much income falls in that band.
+        </div>
       </Card>
 
       {/* Savings by income level chart */}
