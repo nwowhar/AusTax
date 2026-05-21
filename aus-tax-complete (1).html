@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🇦🇺 Australian Tax System · Complete Historical Guide</title>
+<!--
+  ══════════════════════════════════════════════════════
+  GITHUB PAGES DEPLOYMENT
+  ══════════════════════════════════════════════════════
+  1. Save this file as index.html in your repo root
+  2. Push to GitHub
+  3. Settings → Pages → Deploy from branch (main / root)
+  4. Live at: https://yourusername.github.io/repo-name/
+  ══════════════════════════════════════════════════════
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/recharts@2.9.3/umd/Recharts.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.2/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#060b14;color:#e2e8f0;font-family:'DM Sans',system-ui,sans-serif;min-height:100vh;line-height:1.6;font-size:14px}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:#0a1020}
+::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:#1e293b;border-radius:2px;outline:none;cursor:pointer;vertical-align:middle}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#3b82f6;border:2px solid #060b14;box-shadow:0 0 0 3px rgba(59,130,246,.25);cursor:pointer;transition:box-shadow .15s}
+input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 5px rgba(59,130,246,.18)}
+button{cursor:pointer;font-family:inherit}
+table{width:100%;border-collapse:collapse}
+</style>
+</head>
+<body>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#060b14;color:#334155;font-family:monospace;font-size:12px;letter-spacing:3px">LOADING AUSTRALIAN TAX DATA...</div></div>
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useCallback } = React;
+const {
+  LineChart, Line, BarChart, Bar, AreaChart, Area, ComposedChart,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ReferenceLine, ResponsiveContainer, Cell, PieChart, Pie
+} = Recharts;
+
+// ─── TOKENS ──────────────────────────────────────────────────
+const C = {
+  bg:'#060b14', card:'rgba(255,255,255,0.02)', border:'#0f2040',
+  border2:'#1e293b', labor:'#ef4444', liberal:'#3b82f6',
+  accent:'#3b82f6', green:'#4ade80', yellow:'#fbbf24',
+  orange:'#fb923c', purple:'#c084fc', pink:'#f43f5e',
+  t1:'#e2e8f0', t2:'#94a3b8', t3:'#64748b', t4:'#334155',
+  mono:"'DM Mono',monospace",
+};
+
+// ─── DATA ─────────────────────────────────────────────────────
+
+const INCOME_ERAS = [
+  { id:'keating_1996', label:"Keating '95–96", pm:'Paul Keating', party:'Labor', years:'1983–1996', color:'#f87171', dash:'6 3',
+    note:'High top rate. CGT introduced 1985. Negative gearing briefly quarantined 1985–87.',
+    brackets:[{min:0,max:5400,rate:0},{min:5400,max:20700,rate:.20},{min:20700,max:38000,rate:.34},{min:38000,max:50000,rate:.43},{min:50000,max:Infinity,rate:.47}]},
+  { id:'howard_2001', label:"Howard '00–01", pm:'John Howard', party:'Liberal', years:'1996–2007', color:'#60a5fa', dash:'5 3',
+    note:'Post-GST restructure. Top rate 47¢ kicked in at $60k.',
+    brackets:[{min:0,max:6000,rate:0},{min:6000,max:20000,rate:.17},{min:20000,max:50000,rate:.30},{min:50000,max:60000,rate:.42},{min:60000,max:Infinity,rate:.47}]},
+  { id:'howard_2007', label:"Howard '06–07", pm:'John Howard', party:'Liberal', years:'1996–2007', color:'#3b82f6', dash:'0',
+    note:'Final Howard budget — major cuts. 15¢ from $6k, top rate down to 45¢ from $150k.',
+    brackets:[{min:0,max:6000,rate:0},{min:6000,max:25000,rate:.15},{min:25000,max:75000,rate:.30},{min:75000,max:150000,rate:.40},{min:150000,max:Infinity,rate:.45}]},
+  { id:'rudd_2009', label:"Rudd '08–09", pm:'Kevin Rudd', party:'Labor', years:'2007–2010', color:'#fb923c', dash:'4 2',
+    note:'GFC stimulus era. Expanded LITO offsets. Inherited Howard bracket structure broadly.',
+    brackets:[{min:0,max:6000,rate:0},{min:6000,max:34000,rate:.15},{min:34000,max:80000,rate:.30},{min:80000,max:180000,rate:.38},{min:180000,max:Infinity,rate:.45}]},
+  { id:'gillard_2013', label:"Gillard '12–13", pm:'Julia Gillard', party:'Labor', years:'2010–2013', color:'#ef4444', dash:'0',
+    note:'Tax-free threshold tripled $6k → $18,200. Biggest low-income reform in decades.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:37000,rate:.19},{min:37000,max:80000,rate:.325},{min:80000,max:180000,rate:.37},{min:180000,max:Infinity,rate:.45}]},
+  { id:'turnbull_2018', label:"Turnbull '17–18", pm:'Malcolm Turnbull', party:'Liberal', years:'2015–2018', color:'#818cf8', dash:'5 3',
+    note:'Legislated Stage 1–3 tax cut package. Extended 37¢ bracket to $87k.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:37000,rate:.19},{min:37000,max:87000,rate:.325},{min:87000,max:180000,rate:.37},{min:180000,max:Infinity,rate:.45}]},
+  { id:'morrison_2021', label:"Morrison '20–21", pm:'Scott Morrison', party:'Liberal', years:'2018–2022', color:'#a78bfa', dash:'0',
+    note:'Stage 2 cuts enacted. 19¢ bracket extended to $45k, 32.5¢ to $120k.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:45000,rate:.19},{min:45000,max:120000,rate:.325},{min:120000,max:180000,rate:.37},{min:180000,max:Infinity,rate:.45}]},
+  { id:'albanese_2024', label:"Albanese '24–25", pm:'Anthony Albanese', party:'Labor', years:'2022–present', color:'#f43f5e', dash:'0',
+    note:'Redesigned Stage 3. 30¢ middle rate replaces 32.5¢. Primarily benefits $45k–$135k earners.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:45000,rate:.19},{min:45000,max:135000,rate:.30},{min:135000,max:190000,rate:.37},{min:190000,max:Infinity,rate:.45}]},
+  // ── BUDGET PROPOSALS (now law) ───────────────────────────────────
+  { id:'albanese_2025', label:"Budget '25–26", pm:'Anthony Albanese', party:'Labor', years:'From 1 Jul 2025', color:'#e879f9', dash:'0', proposed:true,
+    note:'Now law. 1st rate cut: $18,201–$45,000 drops 19% → 16% from 1 July 2025. All other brackets unchanged.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:45000,rate:.16},{min:45000,max:135000,rate:.30},{min:135000,max:190000,rate:.37},{min:190000,max:Infinity,rate:.45}]},
+  { id:'albanese_2026', label:"Budget '26–27", pm:'Anthony Albanese', party:'Labor', years:'From 1 Jul 2026', color:'#d946ef', dash:'6 3', proposed:true,
+    note:'Now law. 2nd rate cut: $18,201–$45,000 drops 16% → 15% from 1 July 2026. All other brackets unchanged.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:45000,rate:.15},{min:45000,max:135000,rate:.30},{min:135000,max:190000,rate:.37},{min:190000,max:Infinity,rate:.45}]},
+  { id:'albanese_2027', label:"Budget '27–28", pm:'Anthony Albanese', party:'Labor', years:'From 1 Jul 2027', color:'#a21caf', dash:'4 4', proposed:true,
+    note:'Now law. 3rd rate cut: $18,201–$45,000 drops 15% → 14% from 1 July 2027. CGT & negative gearing reforms also take effect.',
+    brackets:[{min:0,max:18200,rate:0},{min:18200,max:45000,rate:.14},{min:45000,max:135000,rate:.30},{min:135000,max:190000,rate:.37},{min:190000,max:Infinity,rate:.45}]},
+];
+
+const COMPANY_TAX_DATA = [
+  {year:'1981',large:46,small:46},{year:'1987',large:49,small:49,ev:'Pre-reform peak'},
+  {year:'1988',large:39,small:39,ev:'Keating reform'},{year:'1993',large:33,small:33,ev:'Recession cut'},
+  {year:'1995',large:36,small:36},{year:'2001',large:30,small:30,ev:'GST era'},
+  {year:'2015',large:30,small:28.5,ev:'Small biz concession'},{year:'2017',large:30,small:27.5},
+  {year:'2021',large:30,small:26},{year:'2022',large:30,small:25,ev:'Final small biz rate'},
+  {year:'2024',large:30,small:25},
+];
+
+const MEDICARE_DATA = [
+  {year:'1984',rate:1.0,ev:'Introduced – Hawke'},{year:'1986',rate:1.25},
+  {year:'1993',rate:1.4},{year:'1995',rate:1.5},{year:'1997',rate:1.5},
+  {year:'2014',rate:2.0,ev:'Raised – Abbott'},{year:'2024',rate:2.0},
+];
+
+const SUPER_DATA = [
+  {year:'1992',rate:3},{year:'1995',rate:5},{year:'1997',rate:6},
+  {year:'1998',rate:7},{year:'2000',rate:8},{year:'2002',rate:9},
+  {year:'2013',rate:9.25},{year:'2014',rate:9.5},{year:'2021',rate:10},
+  {year:'2022',rate:10.5},{year:'2023',rate:11},{year:'2024',rate:11.5},{year:'2025',rate:12},
+];
+
+const FUEL_DATA = [
+  {year:'1999',rate:38.14},{year:'2001',rate:38.14,ev:'Howard freezes indexation'},
+  {year:'2014',rate:38.6,ev:'Abbott restores CPI indexation'},{year:'2016',rate:40.7},
+  {year:'2018',rate:41.6},{year:'2020',rate:42.7},
+  {year:'2022',rate:22.1,ev:'Albanese halves excise (Mar)'},{year:'2022b',rate:44.2,ev:'Restored (Sep 2022)'},
+  {year:'2023',rate:47.7},{year:'2024',rate:50.0},
+];
+
+const STAMP_DUTY_DATA = [
+  {state:'NSW',amount:29417},{state:'VIC',amount:40070},{state:'QLD',amount:21850},
+  {state:'SA',amount:35905},{state:'WA',amount:28518},{state:'TAS',amount:28933},
+  {state:'ACT',amount:22500},{state:'NT',amount:36898},
+];
+
+const PAYROLL_DATA = [
+  {state:'NSW',rate:5.45,thresh:1200000},{state:'VIC',rate:4.85,thresh:700000},
+  {state:'QLD',rate:4.75,thresh:1300000},{state:'SA',rate:4.95,thresh:1500000},
+  {state:'WA',rate:5.50,thresh:1000000},{state:'TAS',rate:4.00,thresh:1250000},
+  {state:'ACT',rate:6.85,thresh:2000000},{state:'NT',rate:5.50,thresh:1500000},
+];
+
+const EARNER_TYPES = [
+  {label:'Min Wage',income:45000,color:'#94a3b8'},
+  {label:'Median',income:65000,color:'#fbbf24'},
+  {label:'Average',income:98000,color:'#fb923c'},
+  {label:'High',income:180000,color:'#c084fc'},
+  {label:'Top 1%',income:260000,color:'#f43f5e'},
+];
+
+const INCOME_PTS = Array.from({length:121},(_,i)=>i*2500);
+
+// ─── UTILS ────────────────────────────────────────────────────
+function calcTax(income, brackets) {
+  if (income <= 0) return 0;
+  let t = 0;
+  for (const b of brackets) {
+    if (income <= b.min) break;
+    t += (Math.min(income, b.max === Infinity ? income : b.max) - b.min) * b.rate;
+  }
+  return t;
+}
+function marginalRate(income, brackets) {
+  let r = 0;
+  for (const b of brackets) { if (income > b.min) r = b.rate; }
+  return r * 100;
+}
+const fK = n => n>=1000?`$${(n/1000).toFixed(0)}k`:`$${n}`;
+const fAUD = n => `$${Math.round(n).toLocaleString('en-AU')}`;
+const fPct = (n,d=1) => `${(+n).toFixed(d)}%`;
+
+// ─── SHARED UI ────────────────────────────────────────────────
+const Card = ({children,style={}}) => (
+  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:18,...style}}>{children}</div>
+);
+
+const SLabel = ({children}) => (
+  <div style={{fontSize:10,letterSpacing:2.5,color:C.t3,fontFamily:C.mono,textTransform:'uppercase',marginBottom:12}}>{children}</div>
+);
+
+const InfoBox = ({color=C.accent,icon,title,children}) => (
+  <div style={{background:`${color}08`,border:`1px solid ${color}20`,borderLeft:`3px solid ${color}`,borderRadius:8,padding:'12px 14px',fontSize:12}}>
+    <div style={{fontWeight:600,color,marginBottom:4}}>{icon} {title}</div>
+    <div style={{color:C.t2,lineHeight:1.65}}>{children}</div>
+  </div>
+);
+
+const ChartTip = ({active,payload,label,fmt=(v)=>v,xLabel='Year'}) => {
+  if(!active||!payload?.length) return null;
+  return (
+    <div style={{background:'#0f172a',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',minWidth:160,boxShadow:'0 16px 48px rgba(0,0,0,.6)'}}>
+      <div style={{color:C.t3,fontSize:10,fontFamily:C.mono,letterSpacing:1,marginBottom:6}}>{xLabel}: {label}</div>
+      {payload.filter(p=>p.value!=null).map(p=>(
+        <div key={p.dataKey} style={{display:'flex',justifyContent:'space-between',gap:12,marginBottom:3}}>
+          <span style={{color:p.color,fontSize:12}}>{p.name||p.dataKey}</span>
+          <span style={{color:C.t1,fontFamily:C.mono,fontSize:12,fontWeight:700}}>{fmt(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── TAB 1: PERSONAL INCOME TAX ───────────────────────────────
+function PersonalTaxTab() {
+  const [activeEras,setActiveEras] = useState(new Set(INCOME_ERAS.map(e=>e.id)));
+  const [mode,setMode] = useState('effective');
+  const [income,setIncome] = useState(85000);
+  const [expanded,setExpanded] = useState(null);
+  const [showEarners,setShowEarners] = useState(true);
+
+  const toggleEra = id => setActiveEras(prev=>{
+    const n=new Set(prev);
+    if(n.has(id)){if(n.size>1)n.delete(id);}else n.add(id);
+    return n;
+  });
+
+  const chartData = useMemo(()=>INCOME_PTS.map(inc=>{
+    const pt={income:inc};
+    for(const era of INCOME_ERAS){
+      if(!activeEras.has(era.id)) continue;
+      const tax=calcTax(inc,era.brackets);
+      pt[era.id]=mode==='effective'
+        ? (inc>0?parseFloat((tax/inc*100).toFixed(2)):0)
+        : mode==='marginal'
+          ? marginalRate(inc,era.brackets)
+          : Math.round(tax);
+    }
+    return pt;
+  }),[activeEras,mode]);
+
+  const sliderRows = useMemo(()=>INCOME_ERAS.map(era=>{
+    const tax=calcTax(income,era.brackets);
+    return{...era,tax,eff:income>0?tax/income*100:0,marg:marginalRate(income,era.brackets),home:income-tax};
+  }).filter(e=>activeEras.has(e.id)).sort((a,b)=>a.tax-b.tax),[income,activeEras]);
+
+  const MODES=[{id:'effective',label:'Effective Rate'},{id:'marginal',label:'Marginal Rate'},{id:'dollar',label:'Tax Paid ($)'}];
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      {/* Era pills */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:7,alignItems:'center'}}>
+        {INCOME_ERAS.map(era=>{
+          const on=activeEras.has(era.id);
+          return(
+            <button key={era.id} onClick={()=>toggleEra(era.id)} style={{
+              display:'flex',alignItems:'center',gap:6,padding:'5px 12px',
+              borderRadius:100,fontSize:12,border:`1px solid ${on?era.color+'50':C.border}`,
+              background:on?`${era.color}15`:'rgba(255,255,255,0.02)',
+              color:on?era.color:C.t3,fontFamily:C.mono,
+              opacity:on?1:0.4,transition:'all .15s',
+            }}>
+              <div style={{width:7,height:7,borderRadius:'50%',background:on?era.color:C.t3,flexShrink:0}}/>
+              {era.label}
+              <span style={{fontSize:10,opacity:.7}}>{era.party==='Labor'?'ALP':'LNP'}</span>
+            </button>
+          );
+        })}
+        <button onClick={()=>setShowEarners(p=>!p)} style={{
+          marginLeft:'auto',padding:'5px 12px',borderRadius:100,fontSize:11,
+          border:`1px solid ${showEarners?C.yellow+'40':C.border}`,
+          background:showEarners?`${C.yellow}10`:'transparent',
+          color:showEarners?C.yellow:C.t3,fontFamily:C.mono,transition:'all .15s',
+        }}>◆ Earner Markers</button>
+      </div>
+
+      {/* Mode selector */}
+      <div style={{display:'flex',gap:3,background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`,borderRadius:8,padding:3,width:'fit-content'}}>
+        {MODES.map(m=>(
+          <button key={m.id} onClick={()=>setMode(m.id)} style={{
+            padding:'7px 16px',borderRadius:6,fontSize:13,border:'none',
+            background:mode===m.id?'#1e40af':'transparent',
+            color:mode===m.id?'#fff':C.t3,fontFamily:'inherit',fontWeight:500,transition:'all .15s',
+          }}>{m.label}</button>
+        ))}
+      </div>
+
+      {/* Main chart */}
+      <Card>
+        <div style={{fontSize:11,color:C.t4,fontFamily:C.mono,letterSpacing:1,marginBottom:12}}>
+          {mode==='effective'?'EFFECTIVE TAX RATE':mode==='marginal'?'MARGINAL RATE':'TAX PAID'} · $0 – $300,000
+        </div>
+        <ResponsiveContainer width="100%" height={360}>
+          <LineChart data={chartData} margin={{top:4,right:24,left:0,bottom:4}}>
+            <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+            <XAxis dataKey="income" tickFormatter={fK} tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}}
+              axisLine={{stroke:C.border}} tickLine={false}
+              ticks={[0,50000,100000,150000,200000,250000,300000]}/>
+            <YAxis tickFormatter={v=>mode==='dollar'?fK(v):`${v}%`}
+              tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false} width={50}/>
+            <Tooltip content={<ChartTip fmt={v=>mode==='dollar'?fAUD(v):fPct(v)} xLabel="Income"/>}/>
+            {showEarners&&EARNER_TYPES.map(e=>(
+              <ReferenceLine key={e.label} x={e.income} stroke={e.color} strokeDasharray="3 5" strokeWidth={1.2}
+                label={{value:e.label,position:'insideTopRight',fill:e.color,fontSize:9,fontFamily:C.mono,dy:4}}/>
+            ))}
+            {INCOME_ERAS.map(era=>activeEras.has(era.id)&&(
+              <Line key={era.id} type="monotone" dataKey={era.id}
+                stroke={era.color} strokeWidth={2.2} dot={false}
+                activeDot={{r:4,strokeWidth:0}}
+                strokeDasharray={era.dash==='0'?undefined:era.dash}
+                animationDuration={250}/>
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+        <div style={{display:'flex',flexWrap:'wrap',gap:14,marginTop:10,paddingLeft:50}}>
+          {[{c:C.labor,l:'Labor'},{c:C.liberal,l:'Liberal/National'}].map(p=>(
+            <div key={p.l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.t3}}>
+              <div style={{width:18,height:2.5,background:p.c,borderRadius:2}}/>{p.l}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Slider */}
+      <Card>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:16,flexWrap:'wrap'}}>
+          <div>
+            <SLabel>Income Comparison</SLabel>
+            <div style={{fontSize:20,fontWeight:700,fontFamily:C.mono}}>{fAUD(income)}</div>
+          </div>
+          <div style={{flex:1,minWidth:160}}>
+            <input type="range" min={0} max={300000} step={1000} value={income} onChange={e=>setIncome(+e.target.value)}/>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:C.t4,fontFamily:C.mono,marginTop:3}}>
+              <span>$0</span><span>$150k</span><span>$300k</span>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+            {EARNER_TYPES.map(e=>(
+              <button key={e.label} onClick={()=>setIncome(e.income)} style={{
+                padding:'4px 9px',borderRadius:5,fontSize:11,
+                border:`1px solid ${e.color}40`,background:income===e.income?`${e.color}20`:'transparent',
+                color:e.color,fontFamily:C.mono,transition:'all .15s',
+              }}>{e.label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:5}}>
+          {sliderRows.map(era=>{
+            const pct=income>0?(era.tax/income)*100:0;
+            return(
+              <div key={era.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 10px',borderRadius:7,borderLeft:`3px solid ${era.color}`,background:'rgba(255,255,255,0.01)'}}>
+                <span style={{color:C.t2,fontSize:11,fontFamily:C.mono,minWidth:120}}>{era.label}</span>
+                <div style={{flex:1,height:4,background:'#0f172a',borderRadius:2,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${pct}%`,background:era.color,borderRadius:2,opacity:.65,transition:'width .3s ease'}}/>
+                </div>
+                <span style={{color:'#f87171',fontFamily:C.mono,fontSize:11,minWidth:76,textAlign:'right'}}>−{fAUD(era.tax)}</span>
+                <span style={{color:C.t3,fontFamily:C.mono,fontSize:11,minWidth:44,textAlign:'right'}}>{fPct(era.eff)}</span>
+                <span style={{color:C.green,fontFamily:C.mono,fontSize:11,minWidth:76,textAlign:'right'}}>{fAUD(era.home)}</span>
+              </div>
+            );
+          })}
+          <div style={{display:'flex',justifyContent:'flex-end',gap:0,paddingTop:3}}>
+            {[{l:'Tax Paid',w:76,c:'#f87171'},{l:'Eff. Rate',w:44,c:C.t3},{l:'Take-home',w:76,c:C.green}].map(x=>(
+              <div key={x.l} style={{fontSize:9,color:x.c,fontFamily:C.mono,minWidth:x.w,textAlign:'right',marginRight:x.l!=='Take-home'?10:0}}>{x.l}</div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* Era cards */}
+      <div>
+        <SLabel>Government Era Bracket Detail — click to expand</SLabel>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:10}}>
+          {INCOME_ERAS.filter(e=>activeEras.has(e.id)).map(era=>(
+            <div key={era.id} style={{
+              background:C.card,border:`1px solid ${expanded===era.id?era.color+'60':C.border}`,
+              borderRadius:10,padding:14,cursor:'pointer',transition:'border-color .2s',
+            }} onClick={()=>setExpanded(expanded===era.id?null:era.id)}>
+              <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:8}}>
+                <div style={{width:32,height:32,borderRadius:7,background:`${era.color}15`,border:`1px solid ${era.color}25`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:era.color,fontWeight:700}}>{era.pm[0]}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{era.pm}</div>
+                  <div style={{fontSize:10,color:era.color,fontFamily:C.mono}}>{era.party} · {era.years}</div>
+                </div>
+                <div style={{marginLeft:'auto',color:C.t4,transition:'transform .2s',transform:expanded===era.id?'rotate(180deg)':'none'}}>▾</div>
+              </div>
+              <div style={{display:'flex',gap:5,marginBottom:expanded===era.id?10:0}}>
+                {[
+                  {l:'Top Rate',v:`${Math.max(...era.brackets.map(b=>b.rate*100)).toFixed(0)}¢`},
+                  {l:'Tax-Free',v:fK(era.brackets[0].max)},
+                  {l:'Bands',v:era.brackets.length},
+                ].map(s=>(
+                  <div key={s.l} style={{flex:1,background:'rgba(0,0,0,.25)',borderRadius:5,padding:'5px 4px',textAlign:'center'}}>
+                    <div style={{fontSize:13,fontWeight:700,color:era.color,fontFamily:C.mono}}>{s.v}</div>
+                    <div style={{fontSize:9,color:C.t3,marginTop:1}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+              {expanded===era.id&&(
+                <div>
+                  <table>
+                    <thead><tr>
+                      {['From','To','Rate'].map(h=>(
+                        <th key={h} style={{textAlign:h==='Rate'?'right':'left',padding:'3px 5px',color:C.t3,fontWeight:600,borderBottom:`1px solid ${C.border}`,fontFamily:C.mono,fontSize:10}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {era.brackets.map((b,i)=>(
+                        <tr key={i} style={{background:i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
+                          <td style={{padding:'4px 5px',color:C.t2,fontFamily:C.mono,fontSize:12}}>{fAUD(b.min)}</td>
+                          <td style={{padding:'4px 5px',color:C.t2,fontFamily:C.mono,fontSize:12}}>{b.max===Infinity?'∞':fAUD(b.max)}</td>
+                          <td style={{padding:'4px 5px',fontFamily:C.mono,fontWeight:700,textAlign:'right',fontSize:12,
+                            color:b.rate===0?C.green:b.rate>=.40?'#f87171':C.yellow}}>
+                            {(b.rate*100).toFixed(1)}¢
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{marginTop:8,fontSize:11,color:C.t3,lineHeight:1.6}}>{era.note}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB 2: COMPANY TAX ───────────────────────────────────────
+function CompanyTaxTab() {
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+        {[
+          {label:'Large Company Rate',value:'30%',sub:'Since 2001–02',color:C.liberal},
+          {label:'Small Business Rate',value:'25%',sub:'Turnover ≤$50M · Since 2021–22',color:C.green},
+          {label:'Super Fund Rate',value:'15%',sub:'Concessional contributions',color:C.yellow},
+        ].map(s=>(
+          <Card key={s.label} style={{textAlign:'center',padding:'16px 12px'}}>
+            <div style={{fontSize:28,fontWeight:700,color:s.color,fontFamily:C.mono,lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.t1,marginTop:5}}>{s.label}</div>
+            <div style={{fontSize:11,color:C.t3,marginTop:2}}>{s.sub}</div>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <SLabel>Company Tax Rate History · 1981 – 2024</SLabel>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={COMPANY_TAX_DATA} margin={{top:4,right:24,left:0,bottom:4}}>
+            <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+            <XAxis dataKey="year" tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={{stroke:C.border}} tickLine={false}/>
+            <YAxis tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false} width={38} tickFormatter={v=>`${v}%`} domain={[20,55]}/>
+            <Tooltip content={<ChartTip fmt={v=>`${v}%`}/>}/>
+            <Line type="stepAfter" dataKey="large" stroke={C.liberal} strokeWidth={2.5} dot={{fill:C.liberal,r:4}} name="Large Company (>$50M turnover)"/>
+            <Line type="stepAfter" dataKey="small" stroke={C.green} strokeWidth={2.5} dot={{fill:C.green,r:4}} name="Small Business (≤$50M turnover)" strokeDasharray="6 3"/>
+          </ComposedChart>
+        </ResponsiveContainer>
+        <div style={{display:'flex',gap:20,marginTop:10,justifyContent:'center'}}>
+          {[{c:C.liberal,l:'Large Company (>$50M turnover)'},{c:C.green,l:'Small Business (≤$50M turnover)',d:'6 3'}].map(p=>(
+            <div key={p.l} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.t2}}>
+              <div style={{width:18,height:2.5,background:p.c,borderRadius:2}}/>{p.l}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <InfoBox color={C.yellow} icon="🧾" title="How Franking Credits Work">
+            Companies pay 30¢ tax per dollar of profit. When dividends are paid to shareholders, those profits have already been taxed. <strong>Franking credits</strong> let shareholders offset their personal tax by the company tax already paid — eliminating double taxation. A $70 dividend from a large company carries $30 of franking credits, grossing up to $100.
+          </InfoBox>
+          <InfoBox color={C.liberal} icon="🏢" title="Small Business Definition">
+            A "base rate entity" must have turnover under $50M AND passive income ≤80% of assessable income. Rate cut: 30% → 28.5% (2015) → 27.5% (2017) → 26% (2021) → 25% (2022). Most Pty Ltd structures qualify if meeting turnover threshold.
+          </InfoBox>
+          <InfoBox color={C.purple} icon="💰" title="Refundable Franking Credits (Howard, 2000)">
+            Before 2000, excess franking credits were wasted. Howard/Costello made them fully refundable in cash — a windfall for low-income investors and SMSFs in pension phase. Labor's 2019 proposal to reverse this contributed to their election loss.
+          </InfoBox>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <Card>
+            <SLabel>Franking Credit Worked Example</SLabel>
+            <div style={{fontSize:13,lineHeight:1.9}}>
+              {[
+                ['Company earns','$100',''],
+                ['Company tax (30%)','−$30','#f87171'],
+                ['Dividend to shareholder','$70',''],
+                ['Franking credit','$30',''],
+                ['Gross-up dividend','$100',''],
+                ['─','',''],
+                ['Your tax @ 32.5%','$32.50',''],
+                ['Less franking credit','−$30.00','#f87171'],
+                ['Net tax to pay','$2.50',C.yellow],
+                ['Vs unfranked: would owe','$22.75','#f87171'],
+              ].map(([k,v,c])=>k==='─'?<div key={k} style={{height:8}}/>:(
+                <div key={k} style={{display:'flex',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,padding:'2px 0'}}>
+                  <span style={{color:C.t2}}>{k}</span>
+                  <span style={{fontFamily:C.mono,fontWeight:600,color:c||(v.startsWith('+')? C.green : v.startsWith('−')?'#f87171':C.t1)}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <SLabel>International Comparison (2024)</SLabel>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7}}>
+              {[
+                {flag:'🇦🇺',country:'Australia',rate:30},
+                {flag:'🇺🇸',country:'USA',rate:21},
+                {flag:'🇬🇧',country:'UK',rate:25},
+                {flag:'🇨🇦',country:'Canada',rate:26.5},
+                {flag:'🇳🇿',country:'NZ',rate:28},
+                {flag:'🇸🇬',country:'Singapore',rate:17},
+                {flag:'🇮🇪',country:'Ireland',rate:12.5},
+                {flag:'🇩🇪',country:'Germany',rate:15},
+              ].map(c=>(
+                <div key={c.country} style={{
+                  background:c.country==='Australia'?`${C.liberal}15`:'rgba(255,255,255,0.02)',
+                  border:`1px solid ${c.country==='Australia'?C.liberal+'40':C.border}`,
+                  borderRadius:7,padding:'8px 6px',textAlign:'center',
+                }}>
+                  <div style={{fontSize:9,marginBottom:2}}>{c.flag}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:c.country==='Australia'?C.liberal:C.t1,fontFamily:C.mono}}>{c.rate}%</div>
+                  <div style={{fontSize:9,color:C.t3,marginTop:1}}>{c.country}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop:8,fontSize:10,color:C.t4}}>Headline rates. Effective rates vary by jurisdiction and structure.</div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB 3: INVESTOR BREAKS ───────────────────────────────────
+function InvestorBreaksTab() {
+  const [cgtIncome,setCgtIncome] = useState(120000);
+  const [cgtGain,setCgtGain] = useState(80000);
+  const [held12,setHeld12] = useState(true);
+  const [era,setEra] = useState('albanese_2024');
+
+  const brackets = INCOME_ERAS.find(e=>e.id===era)?.brackets??[];
+  const discount = held12 ? 0.5 : 1.0;
+  const taxableGain = cgtGain * discount;
+  const taxOnTotal = calcTax(cgtIncome + taxableGain, brackets);
+  const taxOnIncome = calcTax(cgtIncome, brackets);
+  const cgtTax = taxOnTotal - taxOnIncome;
+  const effRate = cgtGain > 0 ? cgtTax / cgtGain * 100 : 0;
+  const saving = held12 ? (calcTax(cgtIncome + cgtGain, brackets) - taxOnIncome) - cgtTax : 0;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      {/* CGT History */}
+      <SLabel>Capital Gains Tax · History</SLabel>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+        {[
+          {period:'Pre-1985',label:'No CGT',icon:'✅',color:C.green,
+            desc:'Capital gains were entirely untaxed. Selling property, shares or assets — zero tax on profit regardless of size.'},
+          {period:'1985 (Keating)',label:'Full Inclusion',icon:'📋',color:C.orange,
+            desc:'CGT introduced. 100% of the gain added to income taxed at full marginal rate. Cost base indexed to CPI. Negative gearing quarantined briefly.'},
+          {period:'Sep 1999 (Howard)',label:'50% Discount',icon:'✂️',color:C.yellow,
+            desc:'Indexation replaced by 50% CGT discount for assets held >12 months. A $200k gain = only $100k taxable income. Massive benefit for property/share investors.'},
+          {period:'Super Pension Phase',label:'0% CGT',icon:'🔑',color:C.purple,
+            desc:'Assets inside a super fund in pension phase pay zero CGT and zero tax on earnings — one of the most powerful legal tax shelters in Australia.'},
+        ].map(item=>(
+          <div key={item.period} style={{
+            background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${item.color}`,borderRadius:8,padding:'12px 14px',
+          }}>
+            <div style={{fontSize:18,marginBottom:6}}>{item.icon}</div>
+            <div style={{color:item.color,fontFamily:C.mono,fontSize:10,marginBottom:3}}>{item.period}</div>
+            <div style={{fontSize:12,fontWeight:600,marginBottom:5}}>{item.label}</div>
+            <div style={{fontSize:11,color:C.t2,lineHeight:1.6}}>{item.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* CGT Calculator */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <Card>
+          <SLabel>CGT Calculator (current era rates)</SLabel>
+          <div style={{display:'flex',flexDirection:'column',gap:13}}>
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                <span>Other Income</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(cgtIncome)}</strong>
+              </div>
+              <input type="range" min={0} max={300000} step={5000} value={cgtIncome} onChange={e=>setCgtIncome(+e.target.value)}/>
+            </div>
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                <span>Capital Gain</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(cgtGain)}</strong>
+              </div>
+              <input type="range" min={0} max={500000} step={5000} value={cgtGain} onChange={e=>setCgtGain(+e.target.value)}/>
+            </div>
+            <div style={{display:'flex',gap:7}}>
+              {[true,false].map(h=>(
+                <button key={String(h)} onClick={()=>setHeld12(h)} style={{
+                  flex:1,padding:'7px 0',borderRadius:7,
+                  border:`1px solid ${held12===h?(h?C.yellow:C.orange)+'50':C.border}`,
+                  background:held12===h?`${h?C.yellow:C.orange}12`:'transparent',
+                  color:held12===h?(h?C.yellow:C.orange):C.t3,
+                  fontSize:12,transition:'all .15s',
+                }}>{h?'✂️ >12 months (50% disc.)':'⚡ <12 months (full rate)'}</button>
+              ))}
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+              {INCOME_ERAS.slice(-4).map(e=>(
+                <button key={e.id} onClick={()=>setEra(e.id)} style={{
+                  padding:'3px 8px',borderRadius:4,fontSize:10,
+                  border:`1px solid ${era===e.id?e.color+'50':C.border}`,
+                  background:era===e.id?`${e.color}12`:'transparent',
+                  color:era===e.id?e.color:C.t3,fontFamily:C.mono,transition:'all .15s',
+                }}>{e.label}</button>
+              ))}
+            </div>
+            <div style={{background:'rgba(0,0,0,.3)',borderRadius:8,padding:13}}>
+              {[
+                ['Gross gain',fAUD(cgtGain),''],
+                ['Taxable gain',fAUD(taxableGain),held12?'(50% discount)':'(no discount)'],
+                ['CGT paid',fAUD(cgtTax),''],
+                ['Effective CGT rate',fPct(effRate),''],
+                ['Tax saving from discount',fAUD(saving),C.green],
+              ].map(([k,v,sub])=>(
+                <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'4px 0',borderBottom:`1px solid ${C.border}`}}>
+                  <div>
+                    <div style={{fontSize:13}}>{k}</div>
+                    {sub&&<div style={{fontSize:10,color:C.t3}}>{sub}</div>}
+                  </div>
+                  <span style={{fontFamily:C.mono,fontWeight:700,color:k.includes('saving')?C.green:C.t1}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <InfoBox color={C.purple} icon="🏠" title="The Investor Double-Benefit">
+            The combination of <strong>negative gearing</strong> (deducting losses at your full marginal rate — up to 45¢) and the <strong>50% CGT discount</strong> on eventual sale is Australia's most powerful investor tax mechanism. Losses deducted at 45¢ but gains taxed at half rate.
+          </InfoBox>
+          <InfoBox color={C.labor} icon="📋" title="Keating's Quarantine (1985–87)">
+            Negative gearing was briefly quarantined so losses could only offset other investment income — not salary. It was reinstated after 2 years, following claims (disputed by many economists) of a rental shortage in Sydney and Perth.
+          </InfoBox>
+          <InfoBox color={C.yellow} icon="⚖️" title="Budget Cost of These Concessions">
+            The ATO estimates: CGT discount ~$6.4B/yr in forgone revenue. Negative gearing ~$3.9B/yr. Super tax concessions ~$50B+/yr. Combined investor concessions represent one of the largest areas of tax expenditure in the federal budget.
+          </InfoBox>
+          <InfoBox color={C.orange} icon="📊" title="CGT on Crypto & Shares">
+            All assets acquired after 20 Sep 1985 are subject to CGT — including crypto, shares, ETFs, options, and collectibles. The 50% discount applies if held >12 months. Super funds pay 10% (not 15%) on discounted gains in accumulation phase.
+          </InfoBox>
+        </div>
+      </div>
+
+      {/* Super */}
+      <SLabel>Superannuation Guarantee · Rate History</SLabel>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <Card>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={SUPER_DATA} margin={{top:4,right:16,left:0,bottom:4}}>
+              <defs>
+                <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={C.green} stopOpacity={0.35}/>
+                  <stop offset="95%" stopColor={C.green} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+              <XAxis dataKey="year" tick={{fill:C.t3,fontSize:10,fontFamily:C.mono}} axisLine={{stroke:C.border}} tickLine={false}/>
+              <YAxis tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false} width={34} tickFormatter={v=>`${v}%`} domain={[0,14]}/>
+              <Tooltip content={<ChartTip fmt={v=>`${v}%`}/>}/>
+              <Area type="stepAfter" dataKey="rate" stroke={C.green} fill="url(#sg)" strokeWidth={2.5} name="SG Rate" dot={{fill:C.green,r:4}}/>
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{marginTop:8,fontSize:11,color:C.t3}}>Howard froze SG at 9% (2002–2013). Final rate 12% from 1 July 2025.</div>
+        </Card>
+        <Card>
+          <SLabel>Super Tax Rate vs Marginal Rates</SLabel>
+          {[
+            {label:'Super pension phase (earnings & CGT)',rate:0,color:'#4ade80'},
+            {label:'Super accumulation (earnings)',rate:15,color:C.green},
+            {label:'Super contributions (concessional)',rate:15,color:C.green},
+            {label:'Super >$3M (earnings, from 2025)',rate:30,color:C.yellow},
+            {label:'Personal income @ $80k',rate:32.5,color:C.yellow},
+            {label:'Personal income @ $180k',rate:37,color:C.orange},
+            {label:'Personal income $190k+',rate:45,color:'#f87171'},
+          ].map(r=>(
+            <div key={r.label} style={{marginBottom:9}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:3}}>
+                <span style={{color:C.t2,fontSize:11}}>{r.label}</span>
+                <span style={{color:r.color,fontFamily:C.mono,fontWeight:700}}>{r.rate}%</span>
+              </div>
+              <div style={{height:4,background:'#0f172a',borderRadius:2,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${r.rate/45*100}%`,background:r.color,borderRadius:2,transition:'width .4s'}}/>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB 4: OTHER TAXES ───────────────────────────────────────
+function OtherTaxesTab() {
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      {/* Summary stats */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+        {[
+          {label:'GST Rate',value:'10%',sub:'Since July 2000',color:C.orange},
+          {label:'Medicare Levy',value:'2%',sub:'Since 2014–15',color:C.labor},
+          {label:'Fuel Excise',value:'~50¢',sub:'Per litre petrol (2024)',color:C.yellow},
+          {label:'Top Stamp Duty',value:'$40k+',sub:'VIC on $750k home',color:C.purple},
+        ].map(s=>(
+          <Card key={s.label} style={{textAlign:'center',padding:'14px 10px'}}>
+            <div style={{fontSize:24,fontWeight:700,color:s.color,fontFamily:C.mono,lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:12,fontWeight:600,color:C.t1,marginTop:5}}>{s.label}</div>
+            <div style={{fontSize:10,color:C.t3,marginTop:2}}>{s.sub}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* GST + Medicare */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <Card>
+          <SLabel>GST · Goods & Services Tax · 10% since July 2000</SLabel>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+            {[
+              {cat:'✅ Taxable (10%)',items:['Clothing & footwear','Electronics & appliances','New homes (builder)','Alcohol & tobacco','Restaurant & cafes','Entertainment','New vehicles','Furniture & homewares','Software subscriptions'],color:C.orange},
+              {cat:'🚫 GST-Free',items:['Fresh fruit & vegetables','Most basic foods','Medical services & health','Education & childcare','Exports','Residential rent','Financial services','Charitable activities','Water supply'],color:C.green},
+            ].map(g=>(
+              <div key={g.cat}>
+                <div style={{fontSize:10,fontWeight:600,color:g.color,marginBottom:6,fontFamily:C.mono}}>{g.cat}</div>
+                {g.items.map(item=>(
+                  <div key={item} style={{fontSize:11,color:C.t2,padding:'2px 0',borderBottom:`1px solid ${C.border}`}}>{item}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:C.t3,lineHeight:1.6,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+            GST revenue is distributed to states & territories via horizontal fiscal equalisation. Howard promised GST would replace state transaction taxes — most (stamp duty, financial institution duty) have never been abolished.
+          </div>
+        </Card>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <Card>
+            <SLabel>Medicare Levy · Historical Rate</SLabel>
+            <ResponsiveContainer width="100%" height={140}>
+              <AreaChart data={MEDICARE_DATA} margin={{top:4,right:12,left:0,bottom:0}}>
+                <defs>
+                  <linearGradient id="med" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={C.labor} stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor={C.labor} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+                <XAxis dataKey="year" tick={{fill:C.t3,fontSize:9,fontFamily:C.mono}} axisLine={{stroke:C.border}} tickLine={false}/>
+                <YAxis tick={{fill:C.t3,fontSize:9,fontFamily:C.mono}} axisLine={false} tickLine={false} width={30} tickFormatter={v=>`${v}%`} domain={[0,2.5]}/>
+                <Tooltip content={<ChartTip fmt={v=>`${v}%`}/>}/>
+                <Area type="stepAfter" dataKey="rate" stroke={C.labor} fill="url(#med)" strokeWidth={2} name="Levy Rate"/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </Card>
+          <InfoBox color={C.labor} icon="🏥" title="Medicare Levy Surcharge">
+            High earners (single >$93k, families >$186k) who don't hold adequate private hospital insurance pay an additional 1.0–1.5% surcharge on top of the 2% levy. This incentivises private health uptake and reduces burden on Medicare.
+          </InfoBox>
+          <InfoBox color={C.yellow} icon="⛽" title="Fuel Excise">
+            Fuel excise is indexed to CPI every 6 months. Howard froze indexation in 2001 as a political decision. Abbott restored it in 2014. In March 2022, Albanese halved it (~22¢/L) for 6 months as cost-of-living relief, then restored in September. Diesel excise is the same rate — both generate $12B+ annually.
+          </InfoBox>
+        </div>
+      </div>
+
+      {/* Fuel excise chart */}
+      <Card>
+        <SLabel>Fuel Excise · Petrol (cents per litre) · 1999–2024</SLabel>
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={FUEL_DATA.filter(d=>d.year!=='2022b')} margin={{top:4,right:24,left:0,bottom:4}}>
+            <defs>
+              <linearGradient id="fuel" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={C.yellow} stopOpacity={0.35}/>
+                <stop offset="95%" stopColor={C.yellow} stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+            <XAxis dataKey="year" tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={{stroke:C.border}} tickLine={false}/>
+            <YAxis tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false} width={36} tickFormatter={v=>`${v}¢`} domain={[0,60]}/>
+            <Tooltip content={<ChartTip fmt={v=>`${v}¢/L`}/>}/>
+            <Area type="monotone" dataKey="rate" stroke={C.yellow} fill="url(#fuel)" strokeWidth={2.2} name="Excise (¢/L)" dot={{fill:C.yellow,r:4}}/>
+          </AreaChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Stamp Duty */}
+      <SLabel>Stamp Duty · State Comparison on a $750,000 Property</SLabel>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+        <Card>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={STAMP_DUTY_DATA} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}>
+              <CartesianGrid strokeDasharray="2 8" stroke={C.border} horizontal={false}/>
+              <XAxis type="number" tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`}/>
+              <YAxis type="category" dataKey="state" tick={{fill:C.t2,fontSize:12,fontFamily:C.mono}} axisLine={false} tickLine={false} width={32}/>
+              <Tooltip content={<ChartTip fmt={fAUD} xLabel="State"/>}/>
+              <Bar dataKey="amount" name="Stamp Duty" radius={[0,4,4,0]}>
+                {STAMP_DUTY_DATA.map((entry,i)=>(
+                  <Cell key={i} fill={
+                    entry.state==='VIC'?'#f87171':
+                    entry.state==='QLD'?C.green:
+                    entry.state==='ACT'?C.yellow:C.liberal
+                  }/>
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <div style={{display:'flex',flexDirection:'column',gap:11}}>
+          <InfoBox color={C.liberal} icon="🏠" title="What is Stamp Duty?">
+            Transfer duty is a state tax on property purchases. On a $750k home, it ranges from ~$22k (ACT) to ~$40k (VIC) — a massive upfront cost added to mortgage debt. First home buyer concessions (full exemptions or discounts) exist in every state under various thresholds.
+          </InfoBox>
+          <InfoBox color={C.green} icon="🔄" title="ACT's Phased Abolition">
+            ACT began replacing stamp duty with annual land tax in 2012 — a 20-year transition. This is widely considered better economics: taxing land holding (not transactions) reduces barriers to moving and improves housing market efficiency. Other states are watching.
+          </InfoBox>
+          <InfoBox color={C.yellow} icon="📊" title="Land Tax (Annual Holding Tax)">
+            Most states charge annual land tax on investment and commercial properties (principal residence exempt). Rates: NSW ~1.6%, VIC 1.3–2.55%, QLD 1.7–2.25%, SA 0.5–3.7%. As land values rise, this becomes a growing state revenue stream.
+          </InfoBox>
+        </div>
+      </div>
+
+      {/* Payroll Tax */}
+      <Card>
+        <SLabel>Payroll Tax · State Comparison (2024) — paid by employers</SLabel>
+        <div style={{overflowX:'auto'}}>
+          <table>
+            <thead>
+              <tr style={{borderBottom:`1px solid ${C.border}`}}>
+                {['State','Rate','Threshold','Tax on $2M payroll','Note'].map(h=>(
+                  <th key={h} style={{textAlign:'left',padding:'8px 12px',color:C.t3,fontWeight:600,fontFamily:C.mono,fontSize:10,letterSpacing:.5,whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {PAYROLL_DATA.map((row,i)=>{
+                const tax=row.rate/100*Math.max(0,2000000-row.thresh);
+                return(
+                  <tr key={row.state} style={{background:i%2===0?'rgba(255,255,255,.015)':'transparent',borderBottom:`1px solid ${C.border}`}}>
+                    <td style={{padding:'8px 12px',fontWeight:600,fontFamily:C.mono}}>{row.state}</td>
+                    <td style={{padding:'8px 12px',fontFamily:C.mono,fontWeight:700,color:row.rate>=6?'#f87171':row.rate<=4.5?C.green:C.yellow}}>{row.rate}%</td>
+                    <td style={{padding:'8px 12px',color:C.t2,fontFamily:C.mono}}>{fAUD(row.thresh)}</td>
+                    <td style={{padding:'8px 12px',color:C.t2,fontFamily:C.mono}}>{tax>0?fAUD(tax):'—'}</td>
+                    <td style={{padding:'8px 12px',color:C.t3,fontSize:12}}>
+                      {row.state==='ACT'?'Highest rate nationally':row.state==='TAS'?'Lowest rate nationally':row.state==='VIC'?'Lowest threshold':row.state==='ACT'?'High rate, high threshold':''}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{marginTop:10,fontSize:11,color:C.t3,lineHeight:1.6}}>
+          Payroll tax is paid by employers on wages above the threshold. Many economists argue it functions as a tax on employment. Healthcare, education, and charitable sectors receive partial or full exemptions in most states.
+        </div>
+      </Card>
+
+      {/* Other hidden taxes */}
+      <Card>
+        <SLabel>Other Federal Taxes & Levies</SLabel>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+          {[
+            {name:'Luxury Car Tax',rate:'33%',desc:'On vehicles above $80,567 (fuel efficient) or $71,849. Applies above threshold only.',color:C.orange},
+            {name:'Wine Equalisation Tax',rate:'29%',desc:'On the wholesale value of wine. Rebates apply to small producers (up to $350k).',color:C.purple},
+            {name:'Tobacco Excise',rate:'~$1.85/stick',desc:'World\'s highest cigarette taxes. Indexed quarterly. A pack of 25 = ~$48–55.',color:'#f87171'},
+            {name:'Alcohol Excise',rate:'Up to $91/L',desc:'Spirits: $91.68/L. Beer >3.5%: ~$56/L. Wine under WET at 29% wholesale.',color:C.yellow},
+            {name:'Customs Duty',rate:'0–10%',desc:'Tariffs on imported goods. Australia has FTAs reducing many to 0%. Cars & textiles higher.',color:C.t2},
+            {name:'Foreign Resident CGT',rate:'No discount',desc:'Non-residents pay CGT at full marginal rate — no 50% discount. Main residence exempt.',color:C.t2},
+            {name:'Div 7A Loans',rate:'8.27%',desc:'Benchmark rate for shareholder loans from private companies. Breach = unfranked dividend.',color:C.t2},
+            {name:'FBT',rate:'47%',desc:'Fringe Benefits Tax paid by employer at top marginal rate. Cars, laptops, entertainment.',color:C.t2},
+          ].map(t=>(
+            <div key={t.name} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'11px 13px'}}>
+              <div style={{fontWeight:600,color:t.color||C.t1,fontSize:12,marginBottom:2}}>{t.name}</div>
+              <div style={{fontSize:16,fontWeight:700,fontFamily:C.mono,color:t.color||C.t1,marginBottom:5}}>{t.rate}</div>
+              <div style={{fontSize:11,color:C.t2,lineHeight:1.5}}>{t.desc}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── TAB 5: TOTAL BURDEN CALCULATOR ──────────────────────────
+function BurdenTab() {
+  const [income,setIncome] = useState(90000);
+  const [spending,setSpending] = useState(42000);
+  const [litres,setLitres] = useState(35);
+  const [era,setEra] = useState('albanese_2024');
+  const [withMedicare,setWithMedicare] = useState(true);
+  const [fhb,setFhb] = useState(false);
+  const [propValue,setPropValue] = useState(750000);
+
+  const brackets = INCOME_ERAS.find(e=>e.id===era)?.brackets??[];
+  const incomeTax = calcTax(income, brackets);
+  const medicareTax = withMedicare ? income * 0.02 : 0;
+  const gstPaid = spending * (10/110);
+  const fuelExcise = litres * 52 * 0.50;
+  const superCost = income * 0.115;
+  const totalTax = incomeTax + medicareTax + gstPaid + fuelExcise;
+  const takehome = income - incomeTax - medicareTax;
+
+  // Stamp duty for NSW (rough estimate)
+  const stampDutyNSW = propValue <= 14000 ? propValue*0.0125
+    : propValue <= 30000 ? 175+((propValue-14000)*0.015)
+    : propValue <= 80000 ? 415+((propValue-30000)*0.0175)
+    : propValue <= 300000 ? 1290+((propValue-80000)*0.035)
+    : propValue <= 1000000 ? 8990+((propValue-300000)*0.045)
+    : 40490+((propValue-1000000)*0.055);
+
+  const pieces = [
+    {label:'Income Tax',value:incomeTax,color:C.liberal},
+    {label:'Medicare Levy',value:medicareTax,color:C.labor},
+    {label:'GST (on spending)',value:gstPaid,color:C.orange},
+    {label:'Fuel Excise',value:fuelExcise,color:C.yellow},
+  ].filter(p=>p.value>0);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+        {/* Inputs */}
+        <div style={{display:'flex',flexDirection:'column',gap:13}}>
+          <Card>
+            <SLabel>Your Situation</SLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:13}}>
+              {[
+                {label:'Annual Income',value:income,set:setIncome,min:0,max:400000,step:5000,fmt:fAUD},
+                {label:'Annual Spending on GST items',value:spending,set:setSpending,min:0,max:150000,step:2000,fmt:fAUD},
+                {label:'Fuel (litres/week)',value:litres,set:setLitres,min:0,max:150,step:5,fmt:v=>`${v}L/wk`},
+              ].map(({label,value,set,min,max,step,fmt})=>(
+                <div key={label}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                    <span>{label}</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fmt(value)}</strong>
+                  </div>
+                  <input type="range" min={min} max={max} step={step} value={value} onChange={e=>set(+e.target.value)}/>
+                </div>
+              ))}
+              <div>
+                <div style={{fontSize:12,color:C.t2,marginBottom:7}}>Tax Era</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                  {INCOME_ERAS.map(e=>(
+                    <button key={e.id} onClick={()=>setEra(e.id)} style={{
+                      padding:'4px 9px',borderRadius:5,fontSize:11,
+                      border:`1px solid ${era===e.id?e.color+'50':C.border}`,
+                      background:era===e.id?`${e.color}12`:'transparent',
+                      color:era===e.id?e.color:C.t3,fontFamily:C.mono,transition:'all .15s',
+                    }}>{e.label.split("'")[0].trim()} '{e.label.split("'")[1]}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>setWithMedicare(p=>!p)} style={{
+                  flex:1,padding:'7px 0',borderRadius:7,
+                  border:`1px solid ${withMedicare?C.labor+'50':C.border}`,
+                  background:withMedicare?`${C.labor}12`:'transparent',
+                  color:withMedicare?C.labor:C.t3,fontSize:12,transition:'all .15s',
+                }}>🏥 Medicare {withMedicare?'On':'Off'}</button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Stamp duty estimate */}
+          <Card>
+            <SLabel>Stamp Duty Estimator (NSW)</SLabel>
+            <div style={{marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+                <span>Property Value</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(propValue)}</strong>
+              </div>
+              <input type="range" min={100000} max={3000000} step={25000} value={propValue} onChange={e=>setPropValue(+e.target.value)}/>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+              <span style={{color:C.t2,fontSize:13}}>NSW Stamp Duty</span>
+              <span style={{fontFamily:C.mono,fontWeight:700,color:C.orange}}>{fAUD(stampDutyNSW)}</span>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+              <span style={{color:C.t2,fontSize:13}}>As % of property</span>
+              <span style={{fontFamily:C.mono,color:C.t2}}>{fPct(stampDutyNSW/propValue*100,2)}</span>
+            </div>
+            <div style={{marginTop:8,fontSize:11,color:C.t3}}>See Other Taxes tab for all state comparisons. First home buyer concessions may reduce this significantly.</div>
+          </Card>
+        </div>
+
+        {/* Output */}
+        <div style={{display:'flex',flexDirection:'column',gap:13}}>
+          <Card>
+            <SLabel>Estimated Annual Tax Breakdown</SLabel>
+            {pieces.map(p=>{
+              const pct=income>0?p.value/income*100:0;
+              return(
+                <div key={p.label} style={{marginBottom:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
+                    <span style={{color:C.t2}}>{p.label}</span>
+                    <div style={{display:'flex',gap:12}}>
+                      <span style={{color:C.t3,fontSize:11,fontFamily:C.mono}}>{fPct(pct)}</span>
+                      <span style={{color:p.color,fontFamily:C.mono,fontWeight:700,minWidth:72,textAlign:'right'}}>{fAUD(p.value)}</span>
+                    </div>
+                  </div>
+                  <div style={{height:4,background:'#0f172a',borderRadius:2,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${Math.min(pct*2.8,100)}%`,background:p.color,borderRadius:2,transition:'width .3s'}}/>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{borderTop:`1px solid ${C.border}`,marginTop:12,paddingTop:12}}>
+              {[
+                {l:'Total federal tax (income + Medicare + GST + fuel)',v:fAUD(totalTax),c:'#f87171'},
+                {l:'Effective rate on income',v:fPct(totalTax/(income||1)*100),c:C.t2},
+                {l:'Take-home after income tax & Medicare',v:fAUD(takehome),c:C.green},
+                {l:'Employer super (not your cost, but your value)',v:`+${fAUD(superCost)}`,c:C.yellow},
+              ].map(row=>(
+                <div key={row.l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:`1px solid ${C.border}`,fontSize:13}}>
+                  <span style={{color:C.t2,fontSize:12}}>{row.l}</span>
+                  <span style={{fontFamily:C.mono,fontWeight:700,color:row.c}}>{row.v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <SLabel>Tax Composition</SLabel>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={pieces} dataKey="value" nameKey="label" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={3}>
+                  {pieces.map((p,i)=><Cell key={i} fill={p.color}/>)}
+                </Pie>
+                <Tooltip content={<ChartTip fmt={fAUD} xLabel="Category"/>}/>
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{display:'flex',flexWrap:'wrap',gap:10,justifyContent:'center',marginTop:4}}>
+              {pieces.map(p=>(
+                <div key={p.label} style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}>
+                  <div style={{width:9,height:9,borderRadius:'50%',background:p.color}}/><span style={{color:C.t2}}>{p.label}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <InfoBox color={C.yellow} icon="⚠️" title="Not included in this calculator">
+            State land tax, payroll tax (employer cost), council rates, vehicle registration, insurance duty, luxury car tax, alcohol/tobacco excise (unless a driver), customs duty, FBT. The full Australian tax burden is typically 3–7% higher than shown depending on lifestyle.
+          </InfoBox>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB 6: BUDGET PROPOSALS ─────────────────────────────────
+function BudgetProposalsTab() {
+  const [income,setIncome] = useState(85000);
+
+  // Compute tax under each era for the income slider
+  const rateRows = [
+    {id:'albanese_2024',label:'Current (2024–25)',rate:19,color:'#f43f5e',status:'Law'},
+    {id:'albanese_2025',label:'2025–26 (1 Jul 2025)',rate:16,color:'#e879f9',status:'Now law'},
+    {id:'albanese_2026',label:'2026–27 (1 Jul 2026)',rate:15,color:'#d946ef',status:'Now law'},
+    {id:'albanese_2027',label:'2027–28 (1 Jul 2027)',rate:14,color:'#a21caf',status:'Now law'},
+  ];
+
+  const baseTax = calcTax(income, INCOME_ERAS.find(e=>e.id==='albanese_2024').brackets);
+  const budgetEras = INCOME_ERAS.filter(e=>e.proposed);
+
+  const savingsData = [45000,65000,90000,120000,180000,260000].map(inc=>{
+    const base = calcTax(inc, INCOME_ERAS.find(e=>e.id==='albanese_2024').brackets);
+    const e25  = calcTax(inc, INCOME_ERAS.find(e=>e.id==='albanese_2025').brackets);
+    const e26  = calcTax(inc, INCOME_ERAS.find(e=>e.id==='albanese_2026').brackets);
+    const e27  = calcTax(inc, INCOME_ERAS.find(e=>e.id==='albanese_2027').brackets);
+    return {
+      income:fK(inc),
+      '25-26 saving': Math.round(base-e25),
+      '26-27 saving': Math.round(base-e26),
+      '27-28 saving': Math.round(base-e27),
+    };
+  });
+
+  const personalTax27 = calcTax(income, INCOME_ERAS.find(e=>e.id==='albanese_2027').brackets);
+  const annualSaving = baseTax - personalTax27;
+  const watoBonus = income >= 18201 ? 250 : 0;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+
+      {/* Status legend */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {[
+          {color:C.green, label:'Now law — passed Parliament'},
+          {color:C.yellow, label:'Budget proposal — not yet law (2026-27 Budget)'},
+          {color:'#f87171', label:'Legislative risk — may be amended or blocked'},
+        ].map(b=>(
+          <div key={b.label} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderRadius:100,
+            background:`${b.color}12`,border:`1px solid ${b.color}30`,fontSize:12,color:b.color}}>
+            <div style={{width:7,height:7,borderRadius:'50%',background:b.color}}/>{b.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Income tax rate cuts section */}
+      <Card>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12,marginBottom:16}}>
+          <div>
+            <SLabel>Personal Income Tax Rate Cuts · 2025-26 Budget (Now Law)</SLabel>
+            <div style={{fontSize:13,color:C.t2,maxWidth:580}}>
+              The lowest marginal rate ($18,201–$45,000 bracket) cuts from 19% to 14% over three years. Every other bracket is unchanged. These cuts are in addition to the Stage 3 redesign already in place.
+            </div>
+          </div>
+          <div style={{padding:'6px 14px',borderRadius:100,background:`${C.green}15`,border:`1px solid ${C.green}40`,fontSize:11,color:C.green,fontFamily:C.mono,whiteSpace:'nowrap'}}>✓ NOW LAW</div>
+        </div>
+
+        {/* Rate timeline */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
+          {[
+            {fy:'2024–25',rate:'19%',color:'#f43f5e',status:'Current'},
+            {fy:'2025–26',rate:'16%',color:'#e879f9',status:'↓ Jul 2025',saving:'$1,350 saving'},
+            {fy:'2026–27',rate:'15%',color:'#d946ef',status:'↓ Jul 2026',saving:'$2,025 saving'},
+            {fy:'2027–28',rate:'14%',color:'#a21caf',status:'↓ Jul 2027',saving:'$2,700 saving'},
+          ].map(r=>(
+            <div key={r.fy} style={{background:`${r.color}10`,border:`1px solid ${r.color}30`,borderRadius:9,padding:'12px',textAlign:'center'}}>
+              <div style={{fontSize:10,color:C.t3,fontFamily:C.mono,marginBottom:4}}>{r.fy}</div>
+              <div style={{fontSize:26,fontWeight:700,color:r.color,fontFamily:C.mono,lineHeight:1}}>{r.rate}</div>
+              <div style={{fontSize:11,color:r.color,marginTop:4,fontWeight:600}}>{r.status}</div>
+              {r.saving&&<div style={{fontSize:10,color:C.green,marginTop:3}}>{r.saving} vs current</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:11,color:C.t3,fontStyle:'italic'}}>Savings shown for someone with full $18,201–$45,000 bracket exposure (e.g. $45,000 taxable income). Actual savings depend on income.</div>
+      </Card>
+
+      {/* Savings by income level chart */}
+      <Card>
+        <SLabel>Annual Tax Saving by Income Level (by 2027–28 vs Current)</SLabel>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={savingsData} margin={{top:4,right:16,left:0,bottom:4}}>
+            <CartesianGrid strokeDasharray="2 8" stroke={C.border}/>
+            <XAxis dataKey="income" tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={{stroke:C.border}} tickLine={false}/>
+            <YAxis tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false} width={50} tickFormatter={v=>`$${v}`}/>
+            <Tooltip content={<ChartTip fmt={v=>`$${v}`} xLabel="Income"/>}/>
+            <Bar dataKey="25-26 saving" name="Saving from Jul 2025" fill="#e879f9" radius={[4,4,0,0]}/>
+            <Bar dataKey="26-27 saving" name="Saving from Jul 2026" fill="#d946ef" radius={[4,4,0,0]}/>
+            <Bar dataKey="27-28 saving" name="Saving from Jul 2027" fill="#a21caf" radius={[4,4,0,0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+        <div style={{display:'flex',gap:14,marginTop:10,justifyContent:'center'}}>
+          {[{c:'#e879f9',l:'Jul 2025 (16%)'},{c:'#d946ef',l:'Jul 2026 (15%)'},{c:'#a21caf',l:'Jul 2027 (14%)'}].map(p=>(
+            <div key={p.l} style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:C.t2}}>
+              <div style={{width:10,height:10,borderRadius:2,background:p.c}}/>{p.l}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Personal savings calculator */}
+      <Card>
+        <SLabel>Your Personal Tax Saving Calculator</SLabel>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:16,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+              <span>Your taxable income</span><strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(income)}</strong>
+            </div>
+            <input type="range" min={0} max={300000} step={2000} value={income} onChange={e=>setIncome(+e.target.value)}/>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+          {[
+            {label:'2025-26 saving (16%)',value:baseTax-calcTax(income,INCOME_ERAS.find(e=>e.id==='albanese_2025').brackets),color:'#e879f9',status:'Now law'},
+            {label:'2026-27 saving (15%)',value:baseTax-calcTax(income,INCOME_ERAS.find(e=>e.id==='albanese_2026').brackets),color:'#d946ef',status:'Now law'},
+            {label:'2027-28 saving (14%)',value:annualSaving,color:'#a21caf',status:'Now law'},
+            {label:'WATO offset (2027-28)',value:watoBonus,color:C.green,status:'Proposed'},
+            {label:'$1,000 deduction benefit',value:income>18200?Math.round(calcTax(income,INCOME_ERAS.find(e=>e.id==='albanese_2025').brackets)-calcTax(Math.max(0,income-1000),INCOME_ERAS.find(e=>e.id==='albanese_2025').brackets)):0,color:C.yellow,status:'Now law (2026-27)'},
+            {label:'Total saving (2027-28 + WATO + deduction)',value:annualSaving+watoBonus+(income>18200?Math.round(calcTax(income,INCOME_ERAS.find(e=>e.id==='albanese_2025').brackets)-calcTax(Math.max(0,income-1000),INCOME_ERAS.find(e=>e.id==='albanese_2025').brackets)):0),color:C.accent,status:'Combined'},
+          ].map(item=>(
+            <div key={item.label} style={{
+              background:`${item.color}08`,border:`1px solid ${item.color}25`,borderRadius:8,padding:'12px',
+            }}>
+              <div style={{fontSize:22,fontWeight:700,color:item.color,fontFamily:C.mono,lineHeight:1}}>{fAUD(item.value)}/yr</div>
+              <div style={{fontSize:12,color:C.t2,marginTop:5}}>{item.label}</div>
+              <div style={{fontSize:10,color:item.color,marginTop:3,fontFamily:C.mono}}>{item.status}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:12,fontSize:11,color:C.t3}}>Excludes Medicare levy, LITO/LMITO. WATO applies to salary/wage/sole trader income only. $1,000 deduction available without receipts from 2026-27.</div>
+      </Card>
+
+      {/* CGT Reform */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+          <SLabel style={{margin:0}}>Capital Gains Tax Reform · From 1 July 2027</SLabel>
+          <div style={{padding:'4px 12px',borderRadius:100,background:`${C.yellow}15`,border:`1px solid ${C.yellow}40`,fontSize:11,color:C.yellow,fontFamily:C.mono}}>⚠ PROPOSED — NOT YET LAW</div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{display:'flex',flexDirection:'column',gap:11}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {[
+                {label:'Before Jul 2027',icon:'✂️',title:'50% CGT Discount',desc:'Hold >12 months → only half the gain is taxable. Simple, favours long-term holders.',color:'#64748b',status:'Current law'},
+                {label:'From Jul 2027',icon:'📊',title:'Indexation + 30% Min Tax',desc:'Cost base adjusted for inflation (CPI). Tax on real gains only. Minimum 30% rate on net gain.',color:C.yellow,status:'Proposed'},
+              ].map(b=>(
+                <div key={b.label} style={{background:`${b.color}08`,border:`1px solid ${b.color}25`,borderTop:`3px solid ${b.color}`,borderRadius:8,padding:13}}>
+                  <div style={{fontSize:18,marginBottom:5}}>{b.icon}</div>
+                  <div style={{fontSize:10,color:b.color,fontFamily:C.mono,marginBottom:3}}>{b.label}</div>
+                  <div style={{fontSize:12,fontWeight:600,marginBottom:5}}>{b.title}</div>
+                  <div style={{fontSize:11,color:C.t2,lineHeight:1.6}}>{b.desc}</div>
+                  <div style={{marginTop:6,fontSize:10,color:b.color,fontFamily:C.mono}}>{b.status}</div>
+                </div>
+              ))}
+            </div>
+            <InfoBox color={C.green} icon="🛡️" title="What's grandfathered?">
+              Properties and assets held on 12 May 2026 (Budget night): gains accrued up to 1 July 2027 will still get the 50% discount. Only post-July 2027 gains are taxed under the new regime — so you pay 50% on pre-reform gains and the new rules on new gains.
+            </InfoBox>
+            <InfoBox color={C.green} icon="🏗️" title="New Builds: Choose Your Regime">
+              Investors in new residential property can choose, on disposal, between the old 50% discount OR the new indexation + 30% minimum tax. This is designed to maintain incentives for new housing construction.
+            </InfoBox>
+          </div>
+          <Card>
+            <SLabel>CGT Comparison: $300k Gain on Property Held 5 Years</SLabel>
+            <div style={{fontSize:13,color:C.t2,marginBottom:14}}>Assumptions: 2.5%/yr inflation, 47% marginal rate, asset purchased Jan 2022, sold Jan 2030.</div>
+            {[
+              {label:'Current law (50% discount)',steps:[
+                ['Gross gain','$300,000'],['Taxable (50% disc.)','$150,000'],['Tax @ 47%','$70,500'],['Effective CGT rate','23.5%'],
+              ],color:'#64748b'},
+              {label:'Proposed (indexation + 30% min tax)',steps:[
+                ['Gross gain','$300,000'],['Inflation adj. (CPI)','~−$38,000'],['Net real gain','~$262,000'],['30% minimum tax','$78,600'],
+              ],color:C.yellow,note:'Higher than current law in this example — gains inflation-adjusted but 30% floor may exceed effective discount rate.'},
+            ].map(scenario=>(
+              <div key={scenario.label} style={{marginBottom:14,padding:12,background:'rgba(0,0,0,.2)',borderRadius:8,border:`1px solid ${scenario.color}25`}}>
+                <div style={{fontSize:12,fontWeight:600,color:scenario.color,marginBottom:8}}>{scenario.label}</div>
+                {scenario.steps.map(([k,v])=>(
+                  <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+                    <span style={{color:C.t2}}>{k}</span>
+                    <span style={{fontFamily:C.mono,color:C.t1}}>{v}</span>
+                  </div>
+                ))}
+                {scenario.note&&<div style={{marginTop:8,fontSize:11,color:C.t3}}>{scenario.note}</div>}
+              </div>
+            ))}
+            <InfoBox color={C.purple} icon="🏠" title="Main Residence Still Exempt">
+              The CGT main residence exemption is completely unchanged. Selling your home remains fully CGT-free regardless of gain size.
+            </InfoBox>
+          </Card>
+        </div>
+      </div>
+
+      {/* Negative Gearing Reform */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+          <SLabel style={{margin:0}}>Negative Gearing Reform · From 1 July 2027</SLabel>
+          <div style={{padding:'4px 12px',borderRadius:100,background:`${C.yellow}15`,border:`1px solid ${C.yellow}40`,fontSize:11,color:C.yellow,fontFamily:C.mono}}>⚠ PROPOSED — NOT YET LAW</div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+          {[
+            {icon:'✅',color:C.green,title:'Fully Grandfathered',sub:'Properties held before 7:30pm AEST 12 May 2026',
+              desc:'No change. Existing investors can continue to offset rental losses against salary and other income indefinitely.'},
+            {icon:'🏗️',color:C.liberal,title:'New Builds — Unchanged',sub:'All properties meeting "new build" definition',
+              desc:'Full negative gearing and choice of CGT regime (old 50% discount or new indexation) maintained. Incentive to invest in new supply.'},
+            {icon:'🚫',color:'#f87171',title:'Established Property — Restricted',sub:'Purchased after 7:30pm AEST 12 May 2026',
+              desc:'Net rental losses can only be offset against rental income or property gains — not wages or other income. Unused losses carry forward to future years.'},
+          ].map(item=>(
+            <div key={item.title} style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${item.color}`,borderRadius:8,padding:14}}>
+              <div style={{fontSize:22,marginBottom:7}}>{item.icon}</div>
+              <div style={{fontSize:13,fontWeight:600,color:item.color,marginBottom:4}}>{item.title}</div>
+              <div style={{fontSize:11,color:item.color,fontFamily:C.mono,marginBottom:7}}>{item.sub}</div>
+              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{item.desc}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <InfoBox color={C.yellow} icon="⚖️" title="Why Now?">
+            The government cited: 83% of the CGT discount benefit flows to the top 10% of income earners; 83% of new investor loans in 2025 were for established properties (not new builds). Reform aims to redirect investor capital toward new housing supply.
+          </InfoBox>
+          <InfoBox color={C.orange} icon="📊" title="Revenue & Housing Impact">
+            Treasury estimates the combined CGT and negative gearing reforms will save ~$7–8B in forgone tax revenue per year by 2030. The government projects modest downward pressure on established property prices and improved first-home-buyer affordability.
+          </InfoBox>
+        </div>
+      </div>
+
+      {/* Other measures */}
+      <SLabel>Other Budget Measures</SLabel>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
+        {[
+          {icon:'💼',color:C.green,status:'Now law (2026-27)',title:'$1,000 Instant Tax Deduction',
+            desc:'Workers can claim up to $1,000 in work-related deductions without receipts when lodging their tax return, from the 2026–27 income year. ~6.2M workers benefit, average saving ~$205.'},
+          {icon:'🧾',color:C.green,status:'Now law (2027-28)',title:'Working Australians Tax Offset (WATO)',
+            desc:'$250 permanent annual offset for all salary, wage, and sole trader income earners from 2027-28. Benefits 13M+ workers. Raises effective tax-free threshold to ~$19,985 (or $24,985 with LITO).'},
+          {icon:'🏦',color:C.yellow,status:'Now law (from 2025-26)',title:'Super Balance >$3M: 30% Tax',
+            desc:'Earnings (including unrealised gains) in super balances above $3M taxed at 30% — up from 15%. Affects ~80,000 Australians. The inclusion of unrealised gains remains controversial and may face legal challenge.'},
+          {icon:'📈',color:C.t3,status:'Ongoing',title:'Medicare Levy Threshold Increase',
+            desc:'Low-income threshold for Medicare levy increased by 2.9% from 2025-26. Provides relief to 1M+ low-income individuals, families, seniors and pensioners.'},
+        ].map(m=>(
+          <div key={m.title} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${m.color}`,borderRadius:8,padding:14}}>
+            <div style={{fontSize:20,marginBottom:7}}>{m.icon}</div>
+            <div style={{fontSize:10,color:m.color,fontFamily:C.mono,marginBottom:4}}>{m.status}</div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>{m.title}</div>
+            <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{m.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <InfoBox color={C.t3} icon="⚠️" title="Legislative Status">
+        The income tax rate cuts (19% → 14%), $1,000 instant deduction, and WATO are legislated and now law. The CGT discount replacement and negative gearing reform (both from July 2027) were announced in the 2026-27 Budget and are NOT yet law — they require Senate passage. Given the government's majority, passage is likely but these may be amended.
+      </InfoBox>
+    </div>
+  );
+}
+
+// ─── ROOT APP ─────────────────────────────────────────────────
+const TABS = [
+  {id:'personal', label:'Personal Income Tax', icon:'👤', C:PersonalTaxTab},
+  {id:'company',  label:'Company Tax',          icon:'🏢', C:CompanyTaxTab},
+  {id:'investor', label:'Investor Breaks',       icon:'📈', C:InvestorBreaksTab},
+  {id:'other',    label:'Other Taxes',           icon:'🏛️', C:OtherTaxesTab},
+  {id:'burden',   label:'Total Burden',          icon:'⚖️', C:BurdenTab},
+  {id:'budget',   label:'Budget Proposals',      icon:'🏛️', C:BudgetProposalsTab, badge:'NEW'},
+];
+
+function App() {
+  const [tab,setTab] = useState('personal');
+  const Tab = TABS.find(t=>t.id===tab)?.C ?? PersonalTaxTab;
+
+  return (
+    <div style={{minHeight:'100vh'}}>
+      {/* Header */}
+      <div style={{background:'linear-gradient(180deg,#0c1829 0%,#060b14 100%)',borderBottom:`1px solid ${C.border}`,padding:'26px 32px 0'}}>
+        <div style={{maxWidth:1240,margin:'0 auto'}}>
+          <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',flexWrap:'wrap',gap:14,marginBottom:22}}>
+            <div>
+              <div style={{fontSize:10,letterSpacing:3,color:C.accent,fontFamily:C.mono,marginBottom:7}}>
+                🇦🇺 AUSTRALIAN TAXATION · COMPLETE HISTORICAL GUIDE
+              </div>
+              <h1 style={{fontSize:24,fontWeight:700,lineHeight:1.25,letterSpacing:-.5}}>
+                The Australian Tax System
+                <span style={{color:C.accent}}> · 1981–2025</span>
+              </h1>
+              <p style={{marginTop:7,color:C.t3,fontSize:13,maxWidth:560}}>
+                Personal income tax, company rates, investor concessions, CGT, GST, stamp duty, fuel excise & more — across every government era.
+              </p>
+            </div>
+            <div style={{display:'flex',gap:22}}>
+              {[{v:'8',l:'Governments'},{v:'12+',l:'Tax Types'},{v:'40+',l:'Years Covered'},{v:'2026',l:'Budget Year'}].map(s=>(
+                <div key={s.l} style={{textAlign:'center'}}>
+                  <div style={{fontSize:24,fontWeight:700,color:C.accent,fontFamily:C.mono,lineHeight:1}}>{s.v}</div>
+                  <div style={{fontSize:10,color:C.t3,marginTop:3,letterSpacing:.5}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Tab nav */}
+          <div style={{display:'flex',gap:0,overflowX:'auto',paddingBottom:0}}>
+            {TABS.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                padding:'11px 18px',
+                borderTop:'none',borderLeft:'none',borderRight:'none',
+                borderBottom:`2px solid ${tab===t.id?C.accent:'transparent'}`,
+                color:tab===t.id?C.accent:C.t3,
+                background:'transparent',
+                fontSize:13,fontWeight:tab===t.id?600:400,
+                fontFamily:'inherit',whiteSpace:'nowrap',transition:'all .15s',cursor:'pointer',
+              }}>
+                {t.icon} {t.label}
+                {t.badge&&<span style={{marginLeft:5,padding:'1px 5px',borderRadius:3,background:'#16a34a',color:'#fff',fontSize:9,fontWeight:700,fontFamily:C.mono}}>{t.badge}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{maxWidth:1240,margin:'0 auto',padding:'22px 32px 40px'}}>
+        <Tab/>
+      </div>
+
+      {/* Footer */}
+      <div style={{borderTop:`1px solid ${C.border}`,padding:'18px 32px',display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,fontSize:10,color:C.t4,fontFamily:C.mono,background:'rgba(255,255,255,0.01)'}}>
+        <span>Sources: ATO.gov.au · Parliament of Australia · Treasury Budget Papers · REIA · State Revenue Offices</span>
+        <span>Educational purposes only · Excludes LITO/LMITO offsets · FY2024–25 AUD</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
