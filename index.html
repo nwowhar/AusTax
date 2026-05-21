@@ -1362,6 +1362,178 @@ function BurdenTab() {
   );
 }
 
+function SmallBizCGTCalc() {
+  const [gain,setGain] = useState(800000);
+  const [held15,setHeld15] = useState(false);
+  const [retiring,setRetiring] = useState(false);
+  const [age55,setAge55] = useState(true);
+  const [useRetirementExempt,setUseRetirementExempt] = useState(true);
+  const [otherIncome,setOtherIncome] = useState(85000);
+  const [postBudget,setPostBudget] = useState(false);
+  const RETIRE_CAP = 500000;
+  const LIFETIME_CGT_CAP = 1865000;
+
+  // Step by step calculation
+  const steps = [];
+  let remaining = gain;
+
+  // Step 0: General discount
+  if (held15 && retiring) {
+    steps.push({label:'15-Year Exemption applied',action:`100% of gain eliminated`,result:0,color:C.green,law:'Div 152-B'});
+    remaining = 0;
+  } else {
+    if (!postBudget) {
+      const disc = remaining * 0.5;
+      steps.push({label:'General 50% CGT discount (held >12 months)',action:`$${Math.round(disc).toLocaleString('en-AU')} removed`,result:remaining-disc,color:C.t3,law:'General'});
+      remaining -= disc;
+    } else {
+      const inflation = remaining * 0.15; // rough 2.5% pa × ~6yr avg assumed
+      steps.push({label:'CPI indexation (proposed — ~2.5%/yr cost base adj.)',action:`~$${Math.round(inflation).toLocaleString('en-AU')} removed`,result:remaining-inflation,color:C.yellow,law:'Proposed from Jul 2027'});
+      remaining = Math.max(0, remaining - inflation);
+    }
+    // Active asset 50%
+    const aaReduction = remaining * 0.5;
+    steps.push({label:'50% Active Asset Reduction (Div 152-C)',action:`$${Math.round(aaReduction).toLocaleString('en-AU')} removed`,result:remaining-aaReduction,color:C.yellow,law:'Div 152-C · Unchanged'});
+    remaining -= aaReduction;
+
+    // Retirement exemption
+    if (useRetirementExempt && remaining > 0) {
+      const exempt = Math.min(remaining, RETIRE_CAP);
+      const note = age55 ? 'No super requirement (age 55+)' : 'Must contribute to super (under 55)';
+      steps.push({label:`Retirement Exemption — ${note}`,action:`$${Math.round(exempt).toLocaleString('en-AU')} exempt (lifetime cap $500k)`,result:remaining-exempt,color:C.orange,law:'Div 152-D · Unchanged'});
+      remaining -= exempt;
+    }
+  }
+
+  // Final CGT
+  const brackets = INCOME_ERAS.find(e=>e.id==='albanese_2024').brackets;
+  const finalCGT = remaining > 0
+    ? Math.max(
+        calcTax(otherIncome + remaining, brackets) - calcTax(otherIncome, brackets),
+        postBudget ? remaining * 0.30 : 0
+      )
+    : 0;
+
+  return (
+    <Card>
+      <SLabel>Div 152 Stacking Calculator — Small Business Sale</SLabel>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+        {/* Inputs */}
+        <div style={{display:'flex',flexDirection:'column',gap:13}}>
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+              <span>Business sale capital gain</span>
+              <strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(gain)}</strong>
+            </div>
+            <input type="range" min={50000} max={5000000} step={50000} value={gain} onChange={e=>setGain(+e.target.value)}/>
+          </div>
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+              <span>Other income (salary etc.)</span>
+              <strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(otherIncome)}</strong>
+            </div>
+            <input type="range" min={0} max={300000} step={5000} value={otherIncome} onChange={e=>setOtherIncome(+e.target.value)}/>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            {[
+              {label:'Owned business 15+ years',val:held15,set:setHeld15,note:'Enables 15-yr exemption if also retiring'},
+              {label:'Retiring / permanently incapacitated',val:retiring,set:setRetiring,note:'Required for 15-yr exemption'},
+              {label:'Aged 55 or over',val:age55,set:setAge55,note:'Under 55 must put retirement exemption into super'},
+              {label:'Apply retirement exemption (up to $500k)',val:useRetirementExempt,set:setUseRetirementExempt,note:'Lifetime cap $500,000'},
+            ].map(opt=>(
+              <div key={opt.label} style={{display:'flex',alignItems:'flex-start',gap:9,padding:'8px 10px',borderRadius:7,background:'rgba(255,255,255,.02)',border:`1px solid ${C.border}`,cursor:'pointer'}}
+                onClick={()=>opt.set(!opt.val)}>
+                <div style={{width:16,height:16,borderRadius:4,background:opt.val?C.green:'transparent',border:`2px solid ${opt.val?C.green:C.t3}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
+                  {opt.val&&<div style={{width:8,height:8,borderRadius:2,background:'#060b14'}}/>}
+                </div>
+                <div>
+                  <div style={{fontSize:12,color:C.t1}}>{opt.label}</div>
+                  <div style={{fontSize:10,color:C.t3,marginTop:1}}>{opt.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            {[
+              {v:false,l:'Current Law (50% discount)'},
+              {v:true,l:'Proposed (post Jul 2027)'},
+            ].map(o=>(
+              <button key={String(o.v)} onClick={()=>setPostBudget(o.v)} style={{
+                flex:1,padding:'7px 0',borderRadius:7,fontSize:12,
+                border:`1px solid ${postBudget===o.v?(o.v?C.yellow:C.liberal)+'50':C.border}`,
+                background:postBudget===o.v?`${o.v?C.yellow:C.liberal}12`:'transparent',
+                color:postBudget===o.v?(o.v?C.yellow:C.liberal):C.t3,transition:'all .15s',
+              }}>{o.l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Results */}
+        <div>
+          <div style={{fontSize:12,color:C.t3,fontFamily:C.mono,letterSpacing:1,marginBottom:10,textTransform:'uppercase'}}>Calculation Waterfall</div>
+          <div style={{display:'flex',flexDirection:'column',gap:1,marginBottom:14}}>
+            {/* Starting gain */}
+            <div style={{display:'flex',justifyContent:'space-between',padding:'7px 10px',background:'rgba(255,255,255,.03)',borderRadius:'6px 6px 0 0',fontSize:13}}>
+              <span style={{color:C.t2}}>Starting gain</span>
+              <span style={{fontFamily:C.mono,fontWeight:700,color:'#f87171'}}>{fAUD(gain)}</span>
+            </div>
+            {steps.map((s,i)=>(
+              <div key={i} style={{padding:'7px 10px',background:'rgba(0,0,0,.25)',fontSize:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                  <span style={{color:C.t2}}>{s.label}</span>
+                  <span style={{fontFamily:C.mono,fontSize:10,color:C.t4}}>{s.law}</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <span style={{color:s.color,fontSize:11}}>−{s.action}</span>
+                  <span style={{fontFamily:C.mono,fontWeight:700,color:s.result===0?C.green:C.t1}}>{fAUD(s.result)} remaining</span>
+                </div>
+              </div>
+            ))}
+            {/* CGT payable */}
+            <div style={{
+              padding:'10px 12px',
+              background:finalCGT===0?`${C.green}15`:'rgba(248,113,113,.1)',
+              borderRadius:'0 0 6px 6px',
+              border:`1px solid ${finalCGT===0?C.green+'40':'#f8717140'}`,
+            }}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:700}}>
+                <span style={{color:C.t1}}>{finalCGT===0?'🎉 CGT payable':'CGT payable'}</span>
+                <span style={{fontFamily:C.mono,color:finalCGT===0?C.green:'#f87171'}}>{fAUD(finalCGT)}</span>
+              </div>
+              {remaining > 0 && <div style={{fontSize:11,color:C.t3,marginTop:4}}>
+                Taxable gain: {fAUD(remaining)} at {(marginalRate(otherIncome+remaining,INCOME_ERAS.find(e=>e.id==='albanese_2024').brackets)).toFixed(0)}% marginal{postBudget?' (30% floor applies)':''}
+              </div>}
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+            {[
+              {label:'Gross sale gain',value:fAUD(gain),color:C.t2},
+              {label:'CGT payable',value:fAUD(finalCGT),color:finalCGT===0?C.green:'#f87171'},
+              {label:'Effective CGT rate',value:fPct(gain>0?finalCGT/gain*100:0),color:C.t2},
+              {label:'Net proceeds after tax',value:fAUD(gain-finalCGT),color:C.green},
+            ].map(s=>(
+              <div key={s.label} style={{background:'rgba(0,0,0,.3)',borderRadius:7,padding:'10px 12px',textAlign:'center'}}>
+                <div style={{fontSize:17,fontWeight:700,fontFamily:C.mono,color:s.color}}>{s.value}</div>
+                <div style={{fontSize:10,color:C.t3,marginTop:3}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {!held15&&useRetirementExempt&&remaining<=0&&(
+            <div style={{marginTop:10,padding:'8px 12px',background:`${C.green}10`,border:`1px solid ${C.green}30`,borderRadius:7,fontSize:12,color:C.green}}>
+              ✅ Qualifying owners applying all Div 152 concessions can achieve $0 CGT on gains up to ~{fAUD(gain)}. This is unchanged by the 2026-27 Budget.
+            </div>
+          )}
+          {held15&&retiring&&(
+            <div style={{marginTop:10,padding:'8px 12px',background:`${C.green}10`,border:`1px solid ${C.green}30`,borderRadius:7,fontSize:12,color:C.green}}>
+              ✅ 15-year exemption: 100% of {fAUD(gain)} gain is completely exempt. $0 CGT. Fully preserved under the budget reforms.
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // ─── TAB 6: BUDGET PROPOSALS ─────────────────────────────────
 function BudgetProposalsTab() {
   const [income,setIncome] = useState(85000);
@@ -1612,13 +1784,202 @@ function BudgetProposalsTab() {
         ))}
       </div>
 
+
+      {/* ── SMALL BUSINESS CGT CONCESSIONS ── */}
+      <div style={{borderTop:`2px solid ${C.border}`,paddingTop:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:4}}>
+          <SLabel style={{margin:0}}>Small Business CGT Concessions (Division 152) · Unchanged by Budget</SLabel>
+          <div style={{padding:'4px 12px',borderRadius:100,background:`${C.green}15`,border:`1px solid ${C.green}40`,fontSize:11,color:C.green,fontFamily:C.mono,whiteSpace:'nowrap'}}>✓ FULLY PROTECTED</div>
+        </div>
+        <div style={{fontSize:13,color:C.t2,marginBottom:14,maxWidth:720,lineHeight:1.65}}>
+          This is the part everyone's missing in the "47% tax" panic. There's a separate CGT system for small businesses under Div 152 of the Tax Act that sits <em>on top of</em> the general discount — and the government has confirmed it's completely untouched. For qualifying owners, a multimillion-dollar business sale can result in <strong style={{color:C.green}}>$0 CGT</strong>.
+        </div>
+
+        {/* Eligibility */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <Card>
+            <SLabel>Eligibility — Must Meet ONE of These</SLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[
+                {label:'Annual turnover < $2 million',icon:'📊',color:C.green},
+                {label:'Net assets ≤ $10 million',icon:'🏦',color:C.green,sub:'Excludes: your home, super, personal assets'},
+              ].map(e=>(
+                <div key={e.label} style={{display:'flex',gap:10,padding:'10px 12px',borderRadius:8,background:`${e.color}08`,border:`1px solid ${e.color}25`}}>
+                  <span style={{fontSize:18}}>{e.icon}</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:e.color}}>{e.label}</div>
+                    {e.sub&&<div style={{fontSize:11,color:C.t3,marginTop:2}}>{e.sub}</div>}
+                  </div>
+                </div>
+              ))}
+              <div style={{padding:'10px 12px',borderRadius:8,background:'rgba(255,255,255,.02)',border:`1px solid ${C.border}`,fontSize:12,color:C.t2}}>
+                <strong style={{color:C.t1}}>+ Active Asset test:</strong> The asset must be used in your business — not just passive income (rent, interest, royalties don't qualify). Must have been active for at least half your ownership period.
+              </div>
+            </div>
+          </Card>
+          <Card>
+            <SLabel>The Four Concessions (Applied in Order)</SLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[
+                {num:'1',name:'15-Year Exemption',result:'100% tax-free',color:C.green,
+                  cond:'Owned 15+ years AND retiring / permanently incapacitated'},
+                {num:'2',name:'50% Active Asset Reduction',result:'Halves the gain',color:C.yellow,
+                  cond:'Any qualifying small business disposal. Stacks with other concessions.'},
+                {num:'3',name:'Retirement Exemption',result:'Up to $500k tax-free',color:C.orange,
+                  cond:'Lifetime cap $500k. Under 55: must put into super. Over 55: no requirement.'},
+                {num:'4',name:'Rollover Relief',result:'Defer gain 2 years',color:C.purple,
+                  cond:'Buying a replacement asset within 2 years. Defers, doesn't exempt.'},
+              ].map(c=>(
+                <div key={c.num} style={{display:'flex',gap:10,padding:'8px 10px',borderRadius:7,background:'rgba(255,255,255,.02)',border:`1px solid ${C.border}`}}>
+                  <div style={{width:22,height:22,borderRadius:'50%',background:`${c.color}20`,color:c.color,fontWeight:700,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{c.num}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                      <span style={{fontSize:12,fontWeight:600,color:C.t1}}>{c.name}</span>
+                      <span style={{fontSize:11,fontFamily:C.mono,color:c.color,fontWeight:700,whiteSpace:'nowrap'}}>{c.result}</span>
+                    </div>
+                    <div style={{fontSize:11,color:C.t3,marginTop:2,lineHeight:1.5}}>{c.cond}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Stacking calculator */}
+        <SmallBizCGTCalc/>
+      </div>
+
+      {/* ── WHO IS ACTUALLY AFFECTED ── */}
+      <div>
+        <SLabel>Who's Actually Affected by the CGT Reform — Reality Check</SLabel>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:10}}>
+          {[
+            {icon:'🏪',color:C.green,impact:'Protected',
+              title:'Small Business (Div 152 eligible)',
+              sub:'Turnover <$2M or net assets ≤$10M',
+              desc:'15-yr exemption, 50% active asset reduction, and $500k retirement exemption are all unchanged. A qualifying sale can still be completely tax-free. The outrage largely doesn't apply here.'},
+            {icon:'🏭',color:C.yellow,impact:'Materially impacted',
+              title:'Businesses Above the Thresholds',
+              sub:'Turnover >$2M or net assets >$10M',
+              desc:'Cannot access Div 152 concessions. The general 50% discount was their main protection. Under the new regime, the real gain is taxed at marginal rates (min 30%). A significant change.'},
+            {icon:'🚀',color:'#f87171',impact:'Severely impacted',
+              title:'Startup Founders',
+              sub:'Nominal cost base (e.g. $0.001/share)',
+              desc:'CPI indexation provides almost zero benefit when your cost base is near-zero. The full gain is effectively taxed at marginal rates up to 47%. Government has flagged consultation — outcome uncertain.'},
+            {icon:'🏗️',color:C.liberal,impact:'Carve-out',
+              title:'New Residential Property Investors',
+              sub:'Properties purchased post-Budget night',
+              desc:'Can choose between the OLD 50% discount OR new CPI indexation + 30% min tax on disposal. The choice allows optimisation depending on hold period and inflation.'},
+            {icon:'🏠',color:C.green,impact:'Fully exempt',
+              title:'Your Family Home',
+              sub:'Main residence exemption',
+              desc:'Completely unchanged. Zero CGT on the sale of your principal place of residence regardless of gain size. No dollar cap, no hold period requirement.'},
+            {icon:'🔑',color:C.green,impact:'Largely protected',
+              title:'SMSF / Super Funds',
+              sub:'Existing 1/3 discount retained',
+              desc:'Super funds in accumulation phase retain their one-third CGT discount. Pension phase remains 0% CGT and 0% on earnings — unchanged.'},
+          ].map(item=>(
+            <div key={item.title} style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${item.color}`,borderRadius:8,padding:14}}>
+              <div style={{fontSize:20,marginBottom:7}}>{item.icon}</div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                <span style={{fontSize:13,fontWeight:600,color:C.t1}}>{item.title}</span>
+                <span style={{fontSize:10,padding:'2px 7px',borderRadius:100,background:`${item.color}20`,color:item.color,fontFamily:C.mono,fontWeight:700,whiteSpace:'nowrap'}}>{item.impact}</span>
+              </div>
+              <div style={{fontSize:10,color:item.color,fontFamily:C.mono,marginBottom:6}}>{item.sub}</div>
+              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TRUST REFORM ── */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+          <SLabel style={{margin:0}}>Discretionary Trust Reform · From 1 July 2028</SLabel>
+          <div style={{padding:'4px 12px',borderRadius:100,background:`${C.yellow}15`,border:`1px solid ${C.yellow}40`,fontSize:11,color:C.yellow,fontFamily:C.mono}}>⚠ PROPOSED</div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            <InfoBox color={C.yellow} icon="🏛️" title="What's Changing">
+              From 1 July 2028, trustees of discretionary trusts will pay a minimum 30% tax on the taxable income of the trust. This targets the use of trusts to split income among low-tax beneficiaries (children, non-working spouses) to reduce the overall tax rate on high-income families.
+            </InfoBox>
+            <InfoBox color={C.green} icon="🔄" title="Rollover Relief Available">
+              Three years of rollover relief from 1 July 2027 are available for small businesses and others wanting to restructure out of discretionary trusts into a company or fixed trust structure before the new rules apply.
+            </InfoBox>
+            <InfoBox color={C.green} icon="🛡️" title="Carve-outs">
+              The minimum trust tax does not apply to: small business trusts within Div 152 thresholds on active business income, deceased estates, primary production income, income relating to vulnerable minors, and testamentary trusts existing at announcement.
+            </InfoBox>
+          </div>
+          <Card>
+            <SLabel>Income Splitting Example — Current vs Proposed</SLabel>
+            <div style={{fontSize:13,color:C.t2,marginBottom:14}}>Family trust distributing $200,000 to 4 beneficiaries to minimise tax:</div>
+            {[
+              {scenario:'Current Law',color:C.t3,rows:[
+                ['Trust income','$200,000'],
+                ['Distribute $50k to each of 4 people','-'],
+                ['Each pays tax @ 0–19% bracket','~$3,572 each'],
+                ['Total family tax bill','~$14,288'],
+                ['Effective rate','7.1%'],
+              ]},
+              {scenario:'Proposed (from 2028)',color:C.yellow,rows:[
+                ['Trust income','$200,000'],
+                ['Minimum 30% trust-level tax','$60,000'],
+                ['Net distributable','$140,000'],
+                ['Individual beneficiary tax (franked)','Lower/zero'],
+                ['Effective rate','~30%+'],
+              ]},
+            ].map(s=>(
+              <div key={s.scenario} style={{marginBottom:12,padding:12,background:'rgba(0,0,0,.2)',borderRadius:8,border:`1px solid ${s.color}25`}}>
+                <div style={{fontSize:12,fontWeight:600,color:s.color,marginBottom:8}}>{s.scenario}</div>
+                {s.rows.map(([k,v])=>(
+                  <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+                    <span style={{color:C.t2}}>{k}</span>
+                    <span style={{fontFamily:C.mono,color:C.t1}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div style={{fontSize:11,color:C.t3,lineHeight:1.6}}>Simplified illustration. Actual impact depends on beneficiary marginal rates and trust structure. The trust reform is the most significant structural change for high-income families using trusts for income splitting.</div>
+          </Card>
+        </div>
+      </div>
+
+      {/* ── OTHER BUDGET MEASURES ── */}
+      <div>
+        <SLabel>Other 2026-27 Budget Measures</SLabel>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
+          {[
+            {icon:'🔄',color:C.green,status:'Now law (2026-27)',title:'Loss Carry-Back for Companies',
+              desc:'Eligible companies can use a current-year loss to claim a refund of tax paid in the prior two income years. Benefits up to 85,000 companies, mostly small businesses. Previously losses could only be carried forward.'},
+            {icon:'🚀',color:C.green,status:'Proposed (2028-29)',title:'Startup Loss Refundability',
+              desc:'Startups in their first two years can get a refund for tax losses up to the value of FBT and withholding tax paid on wages. Benefits up to 25,000 young companies per year — addresses the chicken-and-egg of early stage cashflow.'},
+            {icon:'⛽',color:C.yellow,status:'Temporary relief (2026)',title:'Fuel Excise Relief — $2.9 Billion',
+              desc:'Temporary fuel excise relief and a reduction in the heavy vehicle road user charge to zero in response to supply chain disruption from the Strait of Hormuz closure. Eligible manufacturing and logistics businesses also get interest-free NRF loans.'},
+            {icon:'🔬',color:C.purple,status:'Proposed',title:'R&D Incentive — Exclusions',
+              desc:'Gambling and tobacco businesses are excluded from the R&D tax incentive. Previously any company meeting the criteria could access the 43.5% offset on R&D spending. Closes a perceived loophole.'},
+            {icon:'🌏',color:'#f87171',status:'Proposed (controversial)',title:'Foreign Resident CGT Strengthened',
+              desc:'Strengthens CGT rules for foreign residents selling Australian assets. Includes some retrospective effects back to 2006 on definition of taxable Australian real property. Renewable energy asset disposal receives limited 15% concession (disposals before 30 June 2030 only).'},
+            {icon:'💼',color:C.liberal,status:'Proposed (from 2026-27)',title:'Venture Capital Expansion',
+              desc:'From 1 July 2027, venture capital tax incentives are expanded and aligned to modern company valuations — intended to address concerns that low valuation thresholds excluded many growth-stage companies from VC concession access.'},
+          ].map(m=>(
+            <div key={m.title} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${m.color}`,borderRadius:8,padding:14}}>
+              <div style={{fontSize:20,marginBottom:7}}>{m.icon}</div>
+              <div style={{fontSize:10,color:m.color,fontFamily:C.mono,marginBottom:4}}>{m.status}</div>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>{m.title}</div>
+              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{m.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <InfoBox color={C.t3} icon="⚠️" title="Legislative Status">
-        The income tax rate cuts (19% → 14%), $1,000 instant deduction, and WATO are legislated and now law. The CGT discount replacement and negative gearing reform (both from July 2027) were announced in the 2026-27 Budget and are NOT yet law — they require Senate passage. Given the government's majority, passage is likely but these may be amended.
+        The income tax rate cuts (19%→14%), $1,000 instant deduction, and WATO are legislated and now law. The CGT discount replacement, negative gearing reform, trust minimum tax, and other structural measures are NOT yet law — they require Senate passage. The government has a workable majority but the detail legislation may be amended, particularly around startups. Consult a tax adviser before making decisions based on proposed measures.
       </InfoBox>
     </div>
   );
 }
 
+// ─── SMALL BUSINESS CGT CALCULATOR ───────────────────────────
 // ─── ROOT APP ─────────────────────────────────────────────────
 const TABS = [
   {id:'personal', label:'Personal Income Tax', icon:'👤', C:PersonalTaxTab},
