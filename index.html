@@ -1534,6 +1534,258 @@ function SmallBizCGTCalc() {
   );
 }
 
+// ─── TRUST CALCULATOR ────────────────────────────────────────
+function TrustCalc() {
+  const defaultBens = [
+    {id:1, name:'Primary earner',         otherIncome:120000, weight:40},
+    {id:2, name:'Non-working spouse',     otherIncome:0,      weight:30},
+    {id:3, name:'Adult child (studying)', otherIncome:8000,   weight:20},
+    {id:4, name:'Retired parent',         otherIncome:22000,  weight:10},
+  ];
+  const [trustIncome, setTrustIncome] = useState(300000);
+  const [bens, setBens] = useState(defaultBens);
+  const [showProposed, setShowProposed] = useState(false);
+
+  const brackets = INCOME_ERAS.find(e=>e.id==='albanese_2027').brackets;
+  const totalW = bens.reduce((s,b)=>s+b.weight, 0) || 1;
+
+  // ── Current law ──────────────────────────────────────────────
+  const currentRows = bens.map(b=>{
+    const pct = b.weight / totalW;
+    const dist = trustIncome * pct;
+    const taxWith = calcTax(b.otherIncome + dist, brackets);
+    const taxWithout = calcTax(b.otherIncome, brackets);
+    const taxOnDist = Math.max(0, taxWith - taxWithout);
+    const marg = marginalRate(b.otherIncome + dist, brackets);
+    return {...b, pct, dist, taxOnDist, marg, netCash: dist - taxOnDist};
+  });
+  const totalCurrentTax = currentRows.reduce((s,r)=>s+r.taxOnDist, 0);
+  const currentEffRate = trustIncome > 0 ? totalCurrentTax / trustIncome * 100 : 0;
+
+  // ── Proposed law (30% trust minimum, then franked distributions) ─
+  const trustTax = trustIncome * 0.30;
+  const netPool = trustIncome * 0.70;
+  const proposedRows = bens.map(b=>{
+    const pct = b.weight / totalW;
+    const afterTaxDist = netPool * pct;           // cash received from trust
+    const grossedUp = afterTaxDist / 0.70;        // add back trust tax credit (like franking)
+    const trustCredit = grossedUp * 0.30;         // their share of trust tax
+    const taxOnGrossed = Math.max(0, calcTax(b.otherIncome + grossedUp, brackets) - calcTax(b.otherIncome, brackets));
+    const topUp = Math.max(0, taxOnGrossed - trustCredit);
+    const refund = Math.max(0, trustCredit - taxOnGrossed);
+    const netCash = afterTaxDist + refund - topUp;
+    return {...b, pct, afterTaxDist, grossedUp, trustCredit, taxOnGrossed, topUp, refund, netCash};
+  });
+  const totalRefunds = proposedRows.reduce((s,r)=>s+r.refund, 0);
+  const totalTopUp   = proposedRows.reduce((s,r)=>s+r.topUp, 0);
+  const totalProposedTax = trustTax + totalTopUp - totalRefunds;
+  const proposedEffRate = trustIncome > 0 ? totalProposedTax / trustIncome * 100 : 0;
+  const extraTax = totalProposedTax - totalCurrentTax;
+
+  const updateBen = (id, field, val) =>
+    setBens(prev => prev.map(b => b.id === id ? {...b, [field]: val} : b));
+
+  const activeRows = showProposed ? proposedRows : currentRows;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      {/* Trust income slider */}
+      <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+        <div style={{flex:1,minWidth:200}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.t2,marginBottom:5}}>
+            <span>Trust net taxable income</span>
+            <strong style={{color:C.t1,fontFamily:C.mono}}>{fAUD(trustIncome)}</strong>
+          </div>
+          <input type="range" min={20000} max={2000000} step={10000}
+            value={trustIncome} onChange={e=>setTrustIncome(+e.target.value)}/>
+        </div>
+        <div style={{display:'flex',gap:6}}>
+          <button onClick={()=>setShowProposed(false)} style={{
+            padding:'7px 14px',borderRadius:7,fontSize:12,
+            border:`1px solid ${!showProposed?C.liberal+'50':C.border}`,
+            background:!showProposed?`${C.liberal}15`:'transparent',
+            color:!showProposed?C.liberal:C.t3,transition:'all .15s',
+          }}>Current Law</button>
+          <button onClick={()=>setShowProposed(true)} style={{
+            padding:'7px 14px',borderRadius:7,fontSize:12,
+            border:`1px solid ${showProposed?C.yellow+'50':C.border}`,
+            background:showProposed?`${C.yellow}12`:'transparent',
+            color:showProposed?C.yellow:C.t3,transition:'all .15s',
+          }}>Proposed (from 2028)</button>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+        {/* Beneficiaries */}
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{fontSize:11,color:C.t3,fontFamily:C.mono,letterSpacing:2,textTransform:'uppercase'}}>Beneficiaries</div>
+          {bens.map(b=>{
+            const pct = b.weight / totalW;
+            const row = activeRows.find(r=>r.id===b.id);
+            return (
+              <div key={b.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:13}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                  <input value={b.name} onChange={e=>updateBen(b.id,'name',e.target.value)}
+                    style={{background:'transparent',border:'none',color:C.t1,fontSize:13,fontWeight:600,fontFamily:'inherit',flex:1,outline:'none',cursor:'text'}}/>
+                  <div style={{fontSize:10,color:C.accent,fontFamily:C.mono,fontWeight:700,whiteSpace:'nowrap'}}>
+                    {(pct*100).toFixed(0)}%
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:9}}>
+                  <div>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:C.t3,marginBottom:4}}>
+                      <span>Other income</span>
+                      <span style={{fontFamily:C.mono}}>{fAUD(b.otherIncome)}</span>
+                    </div>
+                    <input type="range" min={0} max={250000} step={2000}
+                      value={b.otherIncome} onChange={e=>updateBen(b.id,'otherIncome',+e.target.value)}/>
+                  </div>
+                  <div>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:C.t3,marginBottom:4}}>
+                      <span>Share of trust income</span>
+                      <span style={{fontFamily:C.mono}}>{b.weight} pts → {fAUD(row?.dist||row?.afterTaxDist||0)}</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={5}
+                      value={b.weight} onChange={e=>updateBen(b.id,'weight',+e.target.value)}/>
+                  </div>
+                  {/* Result pill */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:5}}>
+                    {showProposed ? [
+                      {l:'Cash dist',v:fAUD(row?.afterTaxDist||0),c:C.t2},
+                      {l:row?.refund>0?'Refund':'Top-up',v:row?.refund>0?`+${fAUD(row.refund)}`:(row?.topUp>0?`-${fAUD(row.topUp)}`:'$0'),c:row?.refund>0?C.green:'#f87171'},
+                      {l:'Net cash',v:fAUD(row?.netCash||0),c:C.green},
+                    ] : [
+                      {l:'Distribution',v:fAUD(row?.dist||0),c:C.t2},
+                      {l:'Tax paid',v:`-${fAUD(row?.taxOnDist||0)}`,c:'#f87171'},
+                      {l:'Net cash',v:fAUD(row?.netCash||0),c:C.green},
+                    ].map(s=>(
+                      <div key={s.l} style={{background:'rgba(0,0,0,.25)',borderRadius:5,padding:'5px 6px',textAlign:'center'}}>
+                        <div style={{fontSize:12,fontWeight:700,fontFamily:C.mono,color:s.c}}>{s.v}</div>
+                        <div style={{fontSize:9,color:C.t3,marginTop:1}}>{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Results */}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <Card>
+            <SLabel>Summary — {showProposed?'Proposed Law (from 2028)':'Current Law'}</SLabel>
+            {showProposed && (
+              <div style={{background:`${C.yellow}08`,border:`1px solid ${C.yellow}25`,borderRadius:8,padding:'10px 12px',marginBottom:14}}>
+                <div style={{fontSize:11,color:C.yellow,fontFamily:C.mono,fontWeight:600,marginBottom:4}}>TRUST-LEVEL TAX (paid first)</div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                  <span style={{color:C.t2}}>30% minimum tax on ${fAUD(trustIncome)} income</span>
+                  <span style={{fontFamily:C.mono,fontWeight:700,color:'#f87171'}}>{fAUD(trustTax)}</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginTop:4}}>
+                  <span style={{color:C.t3}}>Distributable (after-tax) pool</span>
+                  <span style={{fontFamily:C.mono,color:C.t2}}>{fAUD(netPool)}</span>
+                </div>
+                <div style={{fontSize:11,color:C.t3,marginTop:6}}>Distributions then flow with a 30% franking-style credit, like a company dividend. Low-rate beneficiaries get a cash refund; high-rate beneficiaries pay a top-up.</div>
+              </div>
+            )}
+            <div style={{display:'flex',flexDirection:'column',gap:3,marginBottom:14}}>
+              {activeRows.map(r=>(
+                <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderRadius:6,background:'rgba(255,255,255,.015)',fontSize:12}}>
+                  <div style={{minWidth:150,color:C.t2}}>{r.name}</div>
+                  <div style={{display:'flex',gap:12,fontFamily:C.mono,fontSize:11}}>
+                    {showProposed ? <>
+                      <span style={{color:C.t3}}>{(r.pct*100).toFixed(0)}%</span>
+                      <span style={{color:r.refund>0?C.green:'#f87171',minWidth:90,textAlign:'right'}}>
+                        {r.refund>0?`+${fAUD(r.refund)} refund`:r.topUp>0?`+${fAUD(r.topUp)} top-up`:'at 30% rate'}
+                      </span>
+                      <span style={{color:C.green,minWidth:72,textAlign:'right'}}>{fAUD(r.netCash)}</span>
+                    </> : <>
+                      <span style={{color:C.t3}}>{r.marg.toFixed(0)}% marg</span>
+                      <span style={{color:'#f87171',minWidth:72,textAlign:'right'}}>-{fAUD(r.taxOnDist)}</span>
+                      <span style={{color:C.green,minWidth:72,textAlign:'right'}}>{fAUD(r.netCash)}</span>
+                    </>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{borderTop:`1px solid ${C.border}`,paddingTop:12}}>
+              {showProposed ? [
+                ['Total trust tax (30%)', fAUD(trustTax), '#f87171'],
+                ['Individual refunds (to low earners)', `-${fAUD(totalRefunds)}`, C.green],
+                ['Individual top-ups (from high earners)', `+${fAUD(totalTopUp)}`, '#f87171'],
+                ['Net family tax burden', fAUD(totalProposedTax), C.yellow],
+                ['Effective rate', fPct(proposedEffRate), C.yellow],
+              ] : [
+                ['Total tax paid by all beneficiaries', fAUD(totalCurrentTax), '#f87171'],
+                ['Effective rate on trust income', fPct(currentEffRate), C.t2],
+                ['Net family income after tax', fAUD(trustIncome-totalCurrentTax), C.green],
+              ].map(([k,v,c])=>(
+                <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:`1px solid ${C.border}`,fontSize:13}}>
+                  <span style={{color:C.t2}}>{k}</span>
+                  <span style={{fontFamily:C.mono,fontWeight:700,color:c}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Comparison summary */}
+          <Card>
+            <SLabel>Current vs Proposed Comparison</SLabel>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+              {[
+                {label:'Current Law',tax:totalCurrentTax,rate:currentEffRate,net:trustIncome-totalCurrentTax,color:C.liberal},
+                {label:'Proposed (2028)',tax:totalProposedTax,rate:proposedEffRate,net:trustIncome-totalProposedTax,color:C.yellow},
+              ].map(s=>(
+                <div key={s.label} style={{background:`${s.color}08`,border:`1px solid ${s.color}25`,borderRadius:8,padding:12,textAlign:'center'}}>
+                  <div style={{fontSize:11,color:s.color,fontFamily:C.mono,marginBottom:6}}>{s.label}</div>
+                  <div style={{fontSize:22,fontWeight:700,color:'#f87171',fontFamily:C.mono}}>{fAUD(s.tax)}</div>
+                  <div style={{fontSize:11,color:C.t3}}>total tax · {fPct(s.rate)} eff rate</div>
+                  <div style={{marginTop:6,fontSize:14,fontWeight:600,color:C.green,fontFamily:C.mono}}>{fAUD(s.net)}</div>
+                  <div style={{fontSize:10,color:C.t3}}>family keeps</div>
+                </div>
+              ))}
+            </div>
+            <div style={{
+              padding:'12px 14px',borderRadius:8,textAlign:'center',
+              background:extraTax>0?'rgba(248,113,113,.08)':'rgba(74,222,128,.08)',
+              border:`1px solid ${extraTax>0?'#f8717130':C.green+'30'}`,
+            }}>
+              <div style={{fontSize:24,fontWeight:700,fontFamily:C.mono,color:extraTax>0?'#f87171':C.green}}>
+                {extraTax>0?'+':'-'}{fAUD(Math.abs(extraTax))}
+              </div>
+              <div style={{fontSize:12,color:C.t2,marginTop:4}}>
+                extra tax under proposed law
+              </div>
+              <div style={{fontSize:11,color:C.t3,marginTop:3}}>
+                Family loses {fAUD(Math.abs(extraTax))} per year in after-tax income
+              </div>
+            </div>
+            <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:5}}>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={[
+                  {name:'Current',tax:Math.round(totalCurrentTax),keep:Math.round(trustIncome-totalCurrentTax)},
+                  {name:'Proposed',tax:Math.round(totalProposedTax),keep:Math.round(trustIncome-totalProposedTax)},
+                ]} margin={{top:4,right:8,left:0,bottom:4}}>
+                  <XAxis dataKey="name" tick={{fill:C.t3,fontSize:11,fontFamily:C.mono}} axisLine={false} tickLine={false}/>
+                  <YAxis tick={{fill:C.t3,fontSize:10,fontFamily:C.mono}} axisLine={false} tickLine={false} width={56} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`}/>
+                  <Tooltip content={<ChartTip fmt={fAUD} xLabel="Scenario"/>}/>
+                  <Bar dataKey="keep" name="Family keeps" fill={C.green} stackId="a" radius={[0,0,0,0]}/>
+                  <Bar dataKey="tax" name="Tax paid" fill={'#f87171'} stackId="a" radius={[4,4,0,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <InfoBox color={C.t3} icon="⚠️" title="Disclaimer">
+            The proposed trust minimum tax legislation has not been released. This calculator models the most likely mechanism — a company-style 30% prepaid tax with franking-equivalent credits flowing to beneficiaries. The actual detail may differ. Consult a tax adviser before restructuring.
+          </InfoBox>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── TAB 6: BUDGET PROPOSALS ─────────────────────────────────
 function BudgetProposalsTab() {
   const [income,setIncome] = useState(85000);
@@ -1893,55 +2145,80 @@ function BudgetProposalsTab() {
       </div>
 
       {/* ── TRUST REFORM ── */}
-      <div>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
-          <SLabel style={{margin:0}}>Discretionary Trust Reform · From 1 July 2028</SLabel>
-          <div style={{padding:'4px 12px',borderRadius:100,background:`${C.yellow}15`,border:`1px solid ${C.yellow}40`,fontSize:11,color:C.yellow,fontFamily:C.mono}}>⚠ PROPOSED</div>
+      <div style={{borderTop:`2px solid ${C.border}`,paddingTop:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+          <SLabel style={{margin:0}}>Discretionary Trust Reform · Proposed from 1 July 2028</SLabel>
+          <div style={{padding:'4px 12px',borderRadius:100,background:`${C.yellow}15`,border:`1px solid ${C.yellow}40`,fontSize:11,color:C.yellow,fontFamily:C.mono}}>⚠ PROPOSED — NOT YET LAW</div>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-          <div style={{display:'flex',flexDirection:'column',gap:10}}>
-            <InfoBox color={C.yellow} icon="🏛️" title="What's Changing">
-              From 1 July 2028, trustees of discretionary trusts will pay a minimum 30% tax on the taxable income of the trust. This targets the use of trusts to split income among low-tax beneficiaries (children, non-working spouses) to reduce the overall tax rate on high-income families.
+
+        {/* What is a discretionary trust */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
+          {[
+            {icon:'📋',color:C.liberal,title:'What is a Discretionary Trust?',
+              desc:'A legal structure where a trustee controls assets and distributes income each year to beneficiaries from a nominated pool (family members, companies). The trustee chooses who gets what — hence "discretionary". Also called a family trust.'},
+            {icon:'💡',color:C.yellow,title:'Why Are They Used?',
+              desc:'Income splitting: direct income to low-tax family members (e.g. uni students, non-working spouses) to collectively pay far less tax than a single earner would. Also used for asset protection, succession planning, and CGT discount stacking.'},
+            {icon:'🏭',color:C.orange,title:'Common Uses',
+              desc:'Family business income, investment property income, professional practice income (doctors, lawyers, tradespeople), share portfolio income. Roughly 800,000+ discretionary trusts operate in Australia.'},
+          ].map(c=>(
+            <div key={c.title} style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${c.color}`,borderRadius:8,padding:14}}>
+              <div style={{fontSize:20,marginBottom:8}}>{c.icon}</div>
+              <div style={{fontSize:12,fontWeight:600,color:c.color,marginBottom:5}}>{c.title}</div>
+              <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>{c.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* The reform */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div style={{display:'flex',flexDirection:'column',gap:11}}>
+            <InfoBox color={C.yellow} icon="🏛️" title="What's Changing — 30% Minimum Tax">
+              From 1 July 2028, trustees must pay a minimum 30% tax on the trust's taxable income before distribution. This works like company tax with franking credits — beneficiaries then receive distributions with a 30% credit attached. Low-income beneficiaries (below 30%) receive a cash refund; high-income beneficiaries (above 30%) pay a top-up. Income splitting is effectively abolished.
             </InfoBox>
-            <InfoBox color={C.green} icon="🔄" title="Rollover Relief Available">
-              Three years of rollover relief from 1 July 2027 are available for small businesses and others wanting to restructure out of discretionary trusts into a company or fixed trust structure before the new rules apply.
+            <InfoBox color={C.green} icon="🛡️" title="Carve-outs — Who Is Exempt">
+              <strong>Still unaffected:</strong> primary production income (farms), income from small businesses within Div 152 thresholds on active income, deceased estates, testamentary trusts, income distributed to vulnerable minor beneficiaries. Fixed trusts (unit trusts) are also unaffected — the reform targets discretionary trusts only.
             </InfoBox>
-            <InfoBox color={C.green} icon="🛡️" title="Carve-outs">
-              The minimum trust tax does not apply to: small business trusts within Div 152 thresholds on active business income, deceased estates, primary production income, income relating to vulnerable minors, and testamentary trusts existing at announcement.
+            <InfoBox color={C.green} icon="🔄" title="3-Year Rollover Window (2027–2030)">
+              The government is offering rollover relief for three years from 1 July 2027 to restructure out of discretionary trusts into a company or fixed trust without triggering a CGT event. This is a significant concession — restructuring ordinarily crystallises a taxable gain.
+            </InfoBox>
+            <InfoBox color={C.purple} icon="📊" title="Scale of the Change">
+              Treasury estimates the reform raises ~$1.2B per year in additional revenue. Around 800,000 discretionary trusts operate in Australia. Those primarily used for genuine business purposes with beneficiaries above the 30% rate will see little change. Families using trusts to distribute to low-income beneficiaries are most affected.
             </InfoBox>
           </div>
+
+          {/* Mechanics explainer */}
           <Card>
-            <SLabel>Income Splitting Example — Current vs Proposed</SLabel>
-            <div style={{fontSize:13,color:C.t2,marginBottom:14}}>Family trust distributing $200,000 to 4 beneficiaries to minimise tax:</div>
+            <SLabel>How the 30% Minimum Tax Works — Step by Step</SLabel>
+            <div style={{fontSize:13,color:C.t2,marginBottom:12}}>Trust earns <strong style={{color:C.t1}}>$100,000</strong>. Distributed to two beneficiaries:</div>
             {[
-              {scenario:'Current Law',color:C.t3,rows:[
-                ['Trust income','$200,000'],
-                ['Distribute $50k to each of 4 people','-'],
-                ['Each pays tax @ 0–19% bracket','~$3,572 each'],
-                ['Total family tax bill','~$14,288'],
-                ['Effective rate','7.1%'],
-              ]},
-              {scenario:'Proposed (from 2028)',color:C.yellow,rows:[
-                ['Trust income','$200,000'],
-                ['Minimum 30% trust-level tax','$60,000'],
-                ['Net distributable','$140,000'],
-                ['Individual beneficiary tax (franked)','Lower/zero'],
-                ['Effective rate','~30%+'],
-              ]},
+              {step:1,label:'Trust-level tax',desc:'Trustee pays 30% minimum tax before distribution',calc:'$100,000 × 30%',result:'$30,000 paid',color:C.yellow},
+              {step:2,label:'Distributable pool',desc:'Net income after trust tax',calc:'$100,000 − $30,000',result:'$70,000 to distribute',color:C.t2},
+              {step:3,label:'Low-earner gets 50% ($35,000 cash)',desc:'Grossed-up to $50,000. Credit $15,000. At 14% marginal: tax $7,000. Refund = $15,000 − $7,000',calc:'',result:'$8,000 refund received',color:C.green},
+              {step:4,label:'High-earner gets 50% ($35,000 cash)',desc:'Grossed-up to $50,000. Credit $15,000. At 45% marginal: tax $22,500. Top-up = $22,500 − $15,000',calc:'',result:'$7,500 extra paid',color:'#f87171'},
+              {step:5,label:'Net family tax',desc:'Trust tax + top-up − refund',calc:'$30,000 + $7,500 − $8,000',result:'$29,500 total (29.5%)',color:C.yellow},
+              {step:6,label:'Current law equivalent',desc:'Same structure, no trust tax, each at marginal rates',calc:'Low earner $3,572 + high earner $22,500',result:'$26,072 total (26.1%)',color:C.liberal},
             ].map(s=>(
-              <div key={s.scenario} style={{marginBottom:12,padding:12,background:'rgba(0,0,0,.2)',borderRadius:8,border:`1px solid ${s.color}25`}}>
-                <div style={{fontSize:12,fontWeight:600,color:s.color,marginBottom:8}}>{s.scenario}</div>
-                {s.rows.map(([k,v])=>(
-                  <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
-                    <span style={{color:C.t2}}>{k}</span>
-                    <span style={{fontFamily:C.mono,color:C.t1}}>{v}</span>
-                  </div>
-                ))}
+              <div key={s.step} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+                <div style={{width:20,height:20,borderRadius:'50%',background:`${s.color}20`,color:s.color,fontSize:10,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>{s.step}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:600,color:s.color}}>{s.label}</div>
+                  <div style={{fontSize:11,color:C.t3}}>{s.desc}</div>
+                  {s.calc&&<div style={{fontSize:11,color:C.t3,fontFamily:C.mono}}>{s.calc}</div>}
+                </div>
+                <div style={{fontFamily:C.mono,fontSize:11,color:s.color,fontWeight:700,textAlign:'right',whiteSpace:'nowrap',paddingTop:2}}>{s.result}</div>
               </div>
             ))}
-            <div style={{fontSize:11,color:C.t3,lineHeight:1.6}}>Simplified illustration. Actual impact depends on beneficiary marginal rates and trust structure. The trust reform is the most significant structural change for high-income families using trusts for income splitting.</div>
           </Card>
         </div>
+
+        {/* Interactive calculator */}
+        <Card>
+          <SLabel>Interactive Trust Calculator — Compare Current Law vs Proposed</SLabel>
+          <div style={{fontSize:13,color:C.t2,marginBottom:14,lineHeight:1.65}}>
+            Enter your trust's income and each beneficiary's other income and share. Toggle between current and proposed to see the tax impact. Beneficiary names are editable. Shares are weighted and normalised automatically.
+          </div>
+          <TrustCalc/>
+        </Card>
       </div>
 
       {/* ── OTHER BUDGET MEASURES ── */}
